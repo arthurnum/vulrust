@@ -1,0 +1,9 @@
+[package]
+name = "vulrust"
+version = "0.1.0"
+authors = ["Artur Yerameyeu"]
+
+[dependencies]
+vulkano = "0.9.0"
+vulkano-win = "0.9.0"
+winit = "0.11.2"
