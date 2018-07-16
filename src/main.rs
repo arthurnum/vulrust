@@ -1,19 +1,27 @@
 #[macro_use]
 extern crate vulkano;
 extern crate vulkano_win;
+#[macro_use]
+extern crate vulkano_shader_derive;
 extern crate winit;
 
 
 use std::sync::Arc;
+use vulkano::buffer::BufferUsage;
+use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
+use vulkano::command_buffer::DynamicState;
 use vulkano::device::Device;
 use vulkano::image::ImageUsage;
 use vulkano::framebuffer::Framebuffer;
+use vulkano::framebuffer::Subpass;
 use vulkano::instance::DeviceExtensions;
 use vulkano::instance::Features;
 use vulkano::instance::Instance;
 use vulkano::instance::InstanceExtensions;
 use vulkano::instance::PhysicalDevice;
+use vulkano::pipeline::GraphicsPipeline;
+use vulkano::pipeline::viewport::Viewport;
 use vulkano::swapchain::Swapchain;
 use vulkano::sync::now;
 use vulkano::sync::GpuFuture;
@@ -22,15 +30,33 @@ use vulkano_win::VkSurfaceBuild;
 use winit::EventsLoop;
 use winit::WindowBuilder;
 
-mod init;
+
+mod shader_utils;
+
+
+#[derive(Debug, Clone)]
+struct Vertex2D { position: [f32; 2] }
+impl_vertex!(Vertex2D, position);
+
 
 fn main() {
+    /* ##########
+    INSTANCE
+    ########## */
+    println!("Instance.");
     let instance_extensions = InstanceExtensions::supported_by_core().unwrap();
     let instance = Instance::new(None, &instance_extensions, None).unwrap();
 
-    let instance_cloned = instance.clone();
-    let physical_device = PhysicalDevice::enumerate(&instance_cloned).next().unwrap();
+    /* ##########
+    PHYSICAL DEVICE
+    ########## */
+    println!("Physical device.");
+    let physical_device = PhysicalDevice::enumerate(&instance).next().unwrap();
 
+    /* ##########
+    DEVICE
+    ########## */
+    println!("Device.");
     let (device, mut queue_iter) = {
         let queue_family = physical_device.queue_families().next().unwrap();
         let features = Features::none();
@@ -45,30 +71,35 @@ fn main() {
         }
     };
 
+    /* ##########
+    QUEUE
+    ########## */
+    println!("Queue.");
     let present_queue = queue_iter.next().unwrap();
 
-    // let device_cloned = device.clone();
-    // let device_local_buffer: Arc<DeviceLocalBuffer<f32>> = {
-    //   DeviceLocalBuffer::new(device_cloned, BufferUsage::vertex_buffer(), physical_device.queue_families()).unwrap()
-    // };
-
+    /* ##########
+    WINDOW
+    ########## */
+    println!("Window.");
     let window_builder = WindowBuilder::new().with_dimensions(400, 200);
     let mut events_loop = EventsLoop::new();
-    let surface = window_builder.build_vk_surface(&events_loop, instance).unwrap();
+    let surface = window_builder.build_vk_surface(&events_loop, instance.clone()).unwrap();
 
+    /* ##########
+    SWAPCHAIN
+    ########## */
     let caps = surface.capabilities(physical_device).unwrap();
-    let dimensions = caps.current_extent.unwrap_or([640, 480]);
+    let dimensions = caps.current_extent.unwrap_or([400, 200]);
     let buffers_count = 2;
     let (format, _color_space) = caps.supported_formats[0];
-
     let usage = ImageUsage {
         color_attachment: true,
         .. ImageUsage::none()
     };
-
     let sharing_mode = SharingMode::Exclusive(present_queue.family().id());
 
     // Create the swapchain and its buffers.
+    println!("Swapchain.");
     let (swapchain, buffers) = Swapchain::new(
         // Create the swapchain in this `device`'s memory.
         device.clone(),
@@ -98,6 +129,10 @@ fn main() {
         None
     ).unwrap();
 
+    /* ##########
+    RENDERPASS
+    ########## */
+    println!("Renderpass.");
     let render_pass = Arc::new(single_pass_renderpass!(
         device.clone(),
         attachments: {
@@ -114,44 +149,88 @@ fn main() {
         }
     ).unwrap());
 
+    /* ##########
+    FRAMEBUFFERS
+    ########## */
+    println!("Framebuffers.");
+    let framebuffers: Vec<Arc<Framebuffer<_,_>>> = buffers.iter().map(|buffer|
+        Arc::new(
+            Framebuffer::start(render_pass.clone())
+            .add(buffer.clone()).unwrap()
+            .build().unwrap()
+        )
+    ).collect();
+
+    println!("vertex buffer");
+    let vertex_buffer = CpuAccessibleBuffer::from_iter(
+        device.clone(),
+        BufferUsage::all(),
+        vec![
+            Vertex2D { position: [0.0, 0.0] },
+            Vertex2D { position: [0.0, 0.5] },
+            Vertex2D { position: [0.5, 0.0] },
+            Vertex2D { position: [0.5, 0.5] },
+        ].into_iter()
+    ).unwrap();
+
+    // TODO vulkano::descriptor::descriptor_set::PersistentDescriptorSet
+
+    let vs = shader_utils::vs::Shader::load(device.clone()).expect("failed to create shader module");
+    let fs = shader_utils::fs::Shader::load(device.clone()).expect("failed to create shader module");
+
+    /* ##########
+    PIPELINE
+    ########## */
+    println!("Pipeline.");
+    let subpass = Subpass::from(render_pass.clone(), 0).expect("render pass failed");
+    let pipeline = Arc::new(GraphicsPipeline::start()
+        .vertex_input_single_buffer::<Vertex2D>()
+        .vertex_shader(vs.main_entry_point(), ())
+        .triangle_strip()
+        .viewports_dynamic_scissors_irrelevant(1)
+        .fragment_shader(fs.main_entry_point(), ())
+        .render_pass(subpass)
+        .build(device.clone())
+        .expect("render pass failed")
+    );
+
+
     let mut frame_counter = 1;
-
-    let framebuffer_first = Arc::new(
-        Framebuffer::start(render_pass.clone())
-        .add(buffers[0].clone()).unwrap()
-        .build().unwrap()
-    );
-
-    let framebuffer_second = Arc::new(
-        Framebuffer::start(render_pass.clone())
-        .add(buffers[1].clone()).unwrap()
-        .build().unwrap()
-    );
-
     let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
 
+    /* ##########
+    LOOP
+    ########## */
+    println!("Loop.");
     loop {
         previous_frame_end.cleanup_finished();
 
         let (index, acq_future) = vulkano::swapchain::acquire_next_image(swapchain.clone(), None).unwrap();
 
-        let current_framebuffer = {
-            if index == 0 {
-                framebuffer_first.clone()
-            } else {
-                framebuffer_second.clone()
-            }
-        };
-
-        let huy = [
+        let c_color = [
             1.0 * (frame_counter as f32 % 20000.0 / 20000.0), 1.0, 0.0
         ].into();
 
         let command_buffer = AutoCommandBufferBuilder::new(device.clone(), present_queue.family()).unwrap()
-        .begin_render_pass(current_framebuffer, false, vec![huy]).unwrap()
+        .begin_render_pass(framebuffers[index].clone(), false, vec![c_color]).unwrap()
+        .draw(
+            pipeline.clone(),
+            DynamicState {
+                line_width: None,
+                // TODO: Find a way to do this without having to dynamically allocate a Vec every frame.
+                viewports: Some(vec![Viewport {
+                  origin: [0.0, 0.0],
+                  dimensions: [dimensions[0] as f32, dimensions[1] as f32],
+                  depth_range: 0.0 .. 1.0,
+                }]),
+                scissors: None,
+            },
+            vertex_buffer.clone(),
+            (),
+            ()
+        ).unwrap()
         .end_render_pass().unwrap()
         .build().unwrap();
-
 
         let future = previous_frame_end.join(acq_future)
             .then_execute(present_queue.clone(), command_buffer).unwrap()
@@ -171,7 +250,7 @@ fn main() {
         });
         if done { return; }
 
-        println!("Frame #{:?}", frame_counter);
+        // println!("Frame #{:?}", frame_counter);
         frame_counter += 1;
     }
 
