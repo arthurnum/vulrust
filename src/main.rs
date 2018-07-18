@@ -11,6 +11,7 @@ use vulkano::buffer::BufferUsage;
 use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::command_buffer::DynamicState;
+use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use vulkano::device::Device;
 use vulkano::image::ImageUsage;
 use vulkano::framebuffer::Framebuffer;
@@ -29,7 +30,6 @@ use vulkano::sync::SharingMode;
 use vulkano_win::VkSurfaceBuild;
 use winit::EventsLoop;
 use winit::WindowBuilder;
-
 
 mod shader_utils;
 
@@ -173,7 +173,14 @@ fn main() {
         ].into_iter()
     ).unwrap();
 
-    // TODO vulkano::descriptor::descriptor_set::PersistentDescriptorSet
+    println!("color uniform buffer");
+    let color_uniform_buffer = CpuAccessibleBuffer::from_data(
+        device.clone(),
+        BufferUsage::all(),
+        shader_utils::fs::ty::MetaColor {
+            incolor: [0.8, 0.2, 0.4, 1.0]
+        }
+    ).unwrap();
 
     let vs = shader_utils::vs::Shader::load(device.clone()).expect("failed to create shader module");
     let fs = shader_utils::fs::Shader::load(device.clone()).expect("failed to create shader module");
@@ -194,6 +201,16 @@ fn main() {
         .expect("render pass failed")
     );
 
+    println!("descriptor_set");
+    let descriptor_set = Arc::new(
+        PersistentDescriptorSet::start(pipeline.clone(), 0)
+
+        .add_buffer(color_uniform_buffer)
+        .unwrap()
+
+        .build()
+        .unwrap()
+    );
 
     let mut frame_counter = 1;
     let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
@@ -226,7 +243,7 @@ fn main() {
                 scissors: None,
             },
             vertex_buffer.clone(),
-            (),
+            descriptor_set.clone(),
             ()
         ).unwrap()
         .end_render_pass().unwrap()
