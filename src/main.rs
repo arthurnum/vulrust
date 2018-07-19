@@ -4,6 +4,7 @@ extern crate vulkano_win;
 #[macro_use]
 extern crate vulkano_shader_derive;
 extern crate winit;
+extern crate cgmath;
 
 
 use std::sync::Arc;
@@ -38,6 +39,29 @@ mod shader_utils;
 struct Vertex2D { position: [f32; 2] }
 impl_vertex!(Vertex2D, position);
 
+fn ortho(w: f32, h: f32) -> cgmath::Matrix4<f32> {
+    cgmath::Matrix4::new (
+        2.0 / w,
+        0.0,
+        0.0,
+        -1.0,
+
+        0.0,
+        -2.0 / h,
+        0.0,
+        1.0,
+
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+
+        0.0,
+        0.0,
+        0.0,
+        1.0
+    )
+}
 
 fn main() {
     /* ##########
@@ -141,11 +165,17 @@ fn main() {
                 store: Store,
                 format: swapchain.format(),
                 samples: 1,
+            },
+            depth: {
+                load: Clear,
+                store: DontCare,
+                format: vulkano::format::Format::D16Unorm,
+                samples: 1,
             }
         },
         pass: {
             color: [color],
-            depth_stencil: {}
+            depth_stencil: {depth}
         }
     ).unwrap());
 
@@ -153,10 +183,12 @@ fn main() {
     FRAMEBUFFERS
     ########## */
     println!("Framebuffers.");
+    let depth_buffer = vulkano::image::attachment::AttachmentImage::transient(device.clone(), dimensions, vulkano::format::D16Unorm).unwrap();
     let framebuffers: Vec<Arc<Framebuffer<_,_>>> = buffers.iter().map(|buffer|
         Arc::new(
             Framebuffer::start(render_pass.clone())
             .add(buffer.clone()).unwrap()
+            .add(depth_buffer.clone()).unwrap()
             .build().unwrap()
         )
     ).collect();
@@ -167,9 +199,8 @@ fn main() {
         BufferUsage::all(),
         vec![
             Vertex2D { position: [0.0, 0.0] },
-            Vertex2D { position: [0.0, 0.5] },
-            Vertex2D { position: [0.5, 0.0] },
-            Vertex2D { position: [0.5, 0.5] },
+            Vertex2D { position: [200.0, 0.0] },
+            Vertex2D { position: [0.0, 200.0] },
         ].into_iter()
     ).unwrap();
 
@@ -179,6 +210,15 @@ fn main() {
         BufferUsage::all(),
         shader_utils::fs::ty::MetaColor {
             incolor: [0.8, 0.2, 0.4, 1.0]
+        }
+    ).unwrap();
+
+    println!("ortho matrix buffer");
+    let ortho_matrix_buffer = CpuAccessibleBuffer::from_data(
+        device.clone(),
+        BufferUsage::all(),
+        shader_utils::vs::ty::UniformMatrices {
+            world: ortho(400.0, 200.0).into()
         }
     ).unwrap();
 
@@ -196,6 +236,7 @@ fn main() {
         .triangle_strip()
         .viewports_dynamic_scissors_irrelevant(1)
         .fragment_shader(fs.main_entry_point(), ())
+        .depth_stencil_simple_depth()
         .render_pass(subpass)
         .build(device.clone())
         .expect("render pass failed")
@@ -204,6 +245,9 @@ fn main() {
     println!("descriptor_set");
     let descriptor_set = Arc::new(
         PersistentDescriptorSet::start(pipeline.clone(), 0)
+
+        .add_buffer(ortho_matrix_buffer)
+        .unwrap()
 
         .add_buffer(color_uniform_buffer)
         .unwrap()
@@ -229,7 +273,7 @@ fn main() {
         ].into();
 
         let command_buffer = AutoCommandBufferBuilder::new(device.clone(), present_queue.family()).unwrap()
-        .begin_render_pass(framebuffers[index].clone(), false, vec![c_color]).unwrap()
+        .begin_render_pass(framebuffers[index].clone(), false, vec![c_color, 1f32.into()]).unwrap()
         .draw(
             pipeline.clone(),
             DynamicState {
