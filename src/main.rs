@@ -5,11 +5,13 @@ extern crate vulkano_win;
 extern crate vulkano_shader_derive;
 extern crate winit;
 extern crate cgmath;
+extern crate time;
 
 
 use std::sync::Arc;
 use vulkano::buffer::BufferUsage;
 use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
+use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::command_buffer::DynamicState;
 use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
@@ -205,6 +207,11 @@ fn main() {
     ).unwrap();
 
     println!("color uniform buffer");
+    let color_uniform_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+    let color_uniform_subbuffer = color_uniform_buffer.next(shader_utils::fs::ty::MetaColor {
+        incolor: [0.8, 0.2, 0.4, 1.0]
+    }).unwrap();
+
     let color_uniform_buffer = CpuAccessibleBuffer::from_data(
         device.clone(),
         BufferUsage::all(),
@@ -212,6 +219,7 @@ fn main() {
             incolor: [0.8, 0.2, 0.4, 1.0]
         }
     ).unwrap();
+
 
     println!("ortho matrix buffer");
     let ortho_matrix_buffer = CpuAccessibleBuffer::from_data(
@@ -249,30 +257,43 @@ fn main() {
         .add_buffer(ortho_matrix_buffer)
         .unwrap()
 
-        .add_buffer(color_uniform_buffer)
+        .build()
+        .unwrap()
+    );
+
+    let descriptor_set_color = Arc::new(
+        PersistentDescriptorSet::start(pipeline.clone(), 1)
+
+        .add_buffer(color_uniform_subbuffer.clone())
         .unwrap()
 
         .build()
         .unwrap()
     );
 
-    let mut frame_counter = 1;
-    let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
-
     /* ##########
     LOOP
     ########## */
     println!("Loop.");
+    let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
+    let mut frame_counter = 1;
+    let start_time = time::SteadyTime::now();
+
     loop {
         previous_frame_end.cleanup_finished();
+        std::thread::sleep(std::time::Duration::from_millis(10));
 
         let (index, acq_future) = vulkano::swapchain::acquire_next_image(swapchain.clone(), None).unwrap();
 
         let c_color = [
-            1.0 * (frame_counter as f32 % 20000.0 / 20000.0), 1.0, 0.0
+            1.0 * (frame_counter as f32 % 200.0 / 200.0), 1.0, 0.0
         ].into();
 
         let command_buffer = AutoCommandBufferBuilder::new(device.clone(), present_queue.family()).unwrap()
+        .update_buffer(color_uniform_subbuffer.clone(), shader_utils::fs::ty::MetaColor {
+            incolor: [1.0 * (frame_counter as f32 % 20.0 / 20.0), 0.2, 0.4, 1.0]
+        })
+        .unwrap()
         .begin_render_pass(framebuffers[index].clone(), false, vec![c_color, 1f32.into()]).unwrap()
         .draw(
             pipeline.clone(),
@@ -287,7 +308,7 @@ fn main() {
                 scissors: None,
             },
             vertex_buffer.clone(),
-            descriptor_set.clone(),
+            (descriptor_set.clone(), descriptor_set_color.clone()),
             ()
         ).unwrap()
         .end_render_pass().unwrap()
@@ -309,10 +330,12 @@ fn main() {
                 _ => ()
             }
         });
-        if done { return; }
+        if done { break; }
 
         // println!("Frame #{:?}", frame_counter);
         frame_counter += 1;
     }
 
+    let avg_fps = frame_counter / (time::SteadyTime::now() - start_time).num_seconds();
+    println!("Average FPS: {}", avg_fps);
 }

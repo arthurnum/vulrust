@@ -22,7 +22,7 @@ pub mod fs {
 #[src = "
     #version 450
     layout(location = 0) out vec4 f_color;
-    layout(set = 0, binding = 1) uniform MetaColor {
+    layout(set = 1, binding = 0) uniform MetaColor {
         vec4 incolor;
     } meta_color;
     void main() {
