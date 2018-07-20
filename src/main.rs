@@ -212,15 +212,6 @@ fn main() {
         incolor: [0.8, 0.2, 0.4, 1.0]
     }).unwrap();
 
-    let color_uniform_buffer = CpuAccessibleBuffer::from_data(
-        device.clone(),
-        BufferUsage::all(),
-        shader_utils::fs::ty::MetaColor {
-            incolor: [0.8, 0.2, 0.4, 1.0]
-        }
-    ).unwrap();
-
-
     println!("ortho matrix buffer");
     let ortho_matrix_buffer = CpuAccessibleBuffer::from_data(
         device.clone(),
