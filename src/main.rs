@@ -279,6 +279,12 @@ fn main() {
     let mut frame_counter = 1;
     let start_time = time::SteadyTime::now();
 
+    let current_viewport = Some(vec![Viewport {
+        origin: [0.0, 0.0],
+        dimensions: [dimensions[0] as f32, dimensions[1] as f32],
+        depth_range: 0.0 .. 1.0,
+    }]);
+
     loop {
         previous_frame_end.cleanup_finished();
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -299,12 +305,7 @@ fn main() {
             pipeline.clone(),
             DynamicState {
                 line_width: None,
-                // TODO: Find a way to do this without having to dynamically allocate a Vec every frame.
-                viewports: Some(vec![Viewport {
-                  origin: [0.0, 0.0],
-                  dimensions: [dimensions[0] as f32, dimensions[1] as f32],
-                  depth_range: 0.0 .. 1.0,
-                }]),
+                viewports: current_viewport.clone(),
                 scissors: None,
             },
             vertex_buffer.clone(),
