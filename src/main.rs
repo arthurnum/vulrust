@@ -116,7 +116,7 @@ fn main() {
     ########## */
     let caps = surface.capabilities(physical_device).unwrap();
     let dimensions = caps.current_extent.unwrap_or([400, 200]);
-    let buffers_count = 2;
+    let buffers_count = caps.min_image_count;
     let (format, _color_space) = caps.supported_formats[0];
     let usage = ImageUsage {
         color_attachment: true,
@@ -148,7 +148,7 @@ fn main() {
         // How to handle the alpha channel.
         vulkano::swapchain::CompositeAlpha::Opaque,
         // How to present images.
-        vulkano::swapchain::PresentMode::Immediate,
+        vulkano::swapchain::PresentMode::Mailbox,
         // Clip the parts of the buffer which aren't visible.
         true,
         // No previous swapchain.
