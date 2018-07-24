@@ -9,22 +9,16 @@ extern crate time;
 
 
 use std::sync::Arc;
-use vulkano::buffer::BufferUsage;
-use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
-use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::command_buffer::DynamicState;
-use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use vulkano::device::Device;
 use vulkano::image::ImageUsage;
 use vulkano::framebuffer::Framebuffer;
-use vulkano::framebuffer::Subpass;
 use vulkano::instance::DeviceExtensions;
 use vulkano::instance::Features;
 use vulkano::instance::Instance;
 use vulkano::instance::InstanceExtensions;
 use vulkano::instance::PhysicalDevice;
-use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::swapchain::Swapchain;
 use vulkano::sync::now;
@@ -34,36 +28,11 @@ use vulkano_win::VkSurfaceBuild;
 use winit::EventsLoop;
 use winit::WindowBuilder;
 
+mod math_utils;
 mod shader_utils;
+mod gfx_object;
+use gfx_object::GfxObject;
 
-
-#[derive(Debug, Clone)]
-struct Vertex2D { position: [f32; 2] }
-impl_vertex!(Vertex2D, position);
-
-fn ortho(w: f32, h: f32) -> cgmath::Matrix4<f32> {
-    cgmath::Matrix4::new (
-        2.0 / w,
-        0.0,
-        0.0,
-        -1.0,
-
-        0.0,
-        -2.0 / h,
-        0.0,
-        1.0,
-
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-
-        0.0,
-        0.0,
-        0.0,
-        1.0
-    )
-}
 
 fn main() {
     /* ##########
@@ -195,72 +164,12 @@ fn main() {
         )
     ).collect();
 
-    println!("vertex buffer");
-    let vertex_buffer = CpuAccessibleBuffer::from_iter(
-        device.clone(),
-        BufferUsage::all(),
-        vec![
-            Vertex2D { position: [0.0, 0.0] },
-            Vertex2D { position: [200.0, 0.0] },
-            Vertex2D { position: [0.0, 200.0] },
-        ].into_iter()
-    ).unwrap();
 
-    println!("color uniform buffer");
-    let color_uniform_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
-    let color_uniform_subbuffer = color_uniform_buffer.next(shader_utils::fs::ty::MetaColor {
-        incolor: [0.8, 0.2, 0.4, 1.0]
-    }).unwrap();
+    let mut rectangle = GfxObject::new(device.clone(), render_pass.clone());
+    rectangle.create_rectangle([10.0, 10.0], [80.0, 40.0]);
 
-    println!("ortho matrix buffer");
-    let ortho_matrix_buffer = CpuAccessibleBuffer::from_data(
-        device.clone(),
-        BufferUsage::all(),
-        shader_utils::vs::ty::UniformMatrices {
-            world: ortho(400.0, 200.0).into()
-        }
-    ).unwrap();
-
-    let vs = shader_utils::vs::Shader::load(device.clone()).expect("failed to create shader module");
-    let fs = shader_utils::fs::Shader::load(device.clone()).expect("failed to create shader module");
-
-    /* ##########
-    PIPELINE
-    ########## */
-    println!("Pipeline.");
-    let subpass = Subpass::from(render_pass.clone(), 0).expect("render pass failed");
-    let pipeline = Arc::new(GraphicsPipeline::start()
-        .vertex_input_single_buffer::<Vertex2D>()
-        .vertex_shader(vs.main_entry_point(), ())
-        .triangle_strip()
-        .viewports_dynamic_scissors_irrelevant(1)
-        .fragment_shader(fs.main_entry_point(), ())
-        .depth_stencil_simple_depth()
-        .render_pass(subpass)
-        .build(device.clone())
-        .expect("render pass failed")
-    );
-
-    println!("descriptor_set");
-    let descriptor_set = Arc::new(
-        PersistentDescriptorSet::start(pipeline.clone(), 0)
-
-        .add_buffer(ortho_matrix_buffer)
-        .unwrap()
-
-        .build()
-        .unwrap()
-    );
-
-    let descriptor_set_color = Arc::new(
-        PersistentDescriptorSet::start(pipeline.clone(), 1)
-
-        .add_buffer(color_uniform_subbuffer.clone())
-        .unwrap()
-
-        .build()
-        .unwrap()
-    );
+    let mut rectangle2 = GfxObject::new(device.clone(), render_pass.clone());
+    rectangle2.create_rectangle([100.0, 100.0], [180.0, 140.0]);
 
     /* ##########
     LOOP
@@ -286,24 +195,34 @@ fn main() {
             1.0 * (frame_counter as f32 % 200.0 / 200.0), 1.0, 0.0
         ].into();
 
-        let command_buffer = AutoCommandBufferBuilder::new(device.clone(), present_queue.family()).unwrap()
-        .update_buffer(color_uniform_subbuffer.clone(), shader_utils::fs::ty::MetaColor {
-            incolor: [1.0 * (frame_counter as f32 % 20.0 / 20.0), 0.2, 0.4, 1.0]
-        })
-        .unwrap()
-        .begin_render_pass(framebuffers[index].clone(), false, vec![c_color, 1f32.into()]).unwrap()
-        .draw(
-            pipeline.clone(),
+        let mut command_buffer_builder = AutoCommandBufferBuilder::new(device.clone(), present_queue.family()).unwrap()
+        .begin_render_pass(framebuffers[index].clone(), false, vec![c_color, 1f32.into()]).unwrap();
+
+        command_buffer_builder = command_buffer_builder.draw(
+            rectangle.get_pipeline(),
             DynamicState {
                 line_width: None,
                 viewports: current_viewport.clone(),
                 scissors: None,
             },
-            vertex_buffer.clone(),
-            (descriptor_set.clone(), descriptor_set_color.clone()),
+            rectangle.get_vertex_buffer(),
+            rectangle.get_descriptor_set_collection(),
             ()
-        ).unwrap()
-        .end_render_pass().unwrap()
+        ).unwrap();
+
+        command_buffer_builder = command_buffer_builder.draw(
+            rectangle2.get_pipeline(),
+            DynamicState {
+                line_width: None,
+                viewports: current_viewport.clone(),
+                scissors: None,
+            },
+            rectangle2.get_vertex_buffer(),
+            rectangle2.get_descriptor_set_collection(),
+            ()
+        ).unwrap();
+
+        let command_buffer = command_buffer_builder.end_render_pass().unwrap()
         .build().unwrap();
 
         let future = previous_frame_end.join(acq_future)
