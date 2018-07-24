@@ -164,12 +164,14 @@ fn main() {
         )
     ).collect();
 
+    let mut rectangles: Vec<GfxObject> = Vec::new();
 
-    let mut rectangle = GfxObject::new(device.clone(), render_pass.clone());
-    rectangle.create_rectangle([10.0, 10.0], [80.0, 40.0]);
-
-    let mut rectangle2 = GfxObject::new(device.clone(), render_pass.clone());
-    rectangle2.create_rectangle([100.0, 100.0], [180.0, 140.0]);
+    for j in 0..200 {
+        let i = j as f32;
+        let mut rectangle = GfxObject::new(device.clone(), render_pass.clone());
+        rectangle.create_rectangle([i, i], [i + 80.0, i + 40.0]);
+        rectangles.push(rectangle);
+    }
 
     /* ##########
     LOOP
@@ -195,35 +197,30 @@ fn main() {
             1.0 * (frame_counter as f32 % 200.0 / 200.0), 1.0, 0.0
         ].into();
 
-        let mut command_buffer_builder = AutoCommandBufferBuilder::new(device.clone(), present_queue.family()).unwrap()
-        .begin_render_pass(framebuffers[index].clone(), false, vec![c_color, 1f32.into()]).unwrap();
+        let mut command_buffer_builder = AutoCommandBufferBuilder::primary_one_time_submit(device.clone(), present_queue.family()).unwrap()
+            .begin_render_pass(framebuffers[index].clone(), false, vec![c_color, 1f32.into()])
+            .unwrap();
 
-        command_buffer_builder = command_buffer_builder.draw(
-            rectangle.get_pipeline(),
-            DynamicState {
-                line_width: None,
-                viewports: current_viewport.clone(),
-                scissors: None,
-            },
-            rectangle.get_vertex_buffer(),
-            rectangle.get_descriptor_set_collection(),
-            ()
-        ).unwrap();
+        for rectangle in &rectangles {
+            command_buffer_builder = command_buffer_builder.draw(
+                rectangle.get_pipeline(),
+                DynamicState {
+                    line_width: None,
+                    viewports: current_viewport.clone(),
+                    scissors: None,
+                },
+                rectangle.get_vertex_buffer(),
+                rectangle.get_descriptor_set_collection(),
+                ()
+            ).unwrap();
+        }
 
-        command_buffer_builder = command_buffer_builder.draw(
-            rectangle2.get_pipeline(),
-            DynamicState {
-                line_width: None,
-                viewports: current_viewport.clone(),
-                scissors: None,
-            },
-            rectangle2.get_vertex_buffer(),
-            rectangle2.get_descriptor_set_collection(),
-            ()
-        ).unwrap();
+        let command_buffer = command_buffer_builder
+            .end_render_pass()
+            .unwrap()
 
-        let command_buffer = command_buffer_builder.end_render_pass().unwrap()
-        .build().unwrap();
+            .build()
+            .unwrap();
 
         let future = previous_frame_end.join(acq_future)
             .then_execute(present_queue.clone(), command_buffer).unwrap()

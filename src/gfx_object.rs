@@ -21,13 +21,14 @@ impl_vertex!(Vertex2D, position);
 type SBuffer = SingleBufferDefinition<Vertex2D>;
 type BPipeline = Box<PipelineLayoutAbstract + Send + Sync>;
 type RPass = Arc<RenderPassAbstract + Send + Sync>;
+type ADescriptorSet = Arc<DescriptorSet + Send + Sync>;
 
 pub struct GfxObject {
     pub device: Arc<Device>,
     pub render_pass: RPass,
     pub vertex_buffer: Option<Arc<CpuAccessibleBuffer<[Vertex2D]>>>,
     pub pipeline: Option<Arc<GraphicsPipeline<SBuffer, BPipeline, RPass>>>,
-    pub descriptor_set_collection: Option<Vec<Arc<DescriptorSet + Send + Sync>>>
+    pub descriptor_set_collection: Option<Vec<ADescriptorSet>>
 }
 
 impl GfxObject {
@@ -105,7 +106,7 @@ impl GfxObject {
             .unwrap()
         );
 
-        let descriptor_set_collection: Vec<Arc<DescriptorSet + Send + Sync>> = vec![descriptor_set, descriptor_set_color];
+        let descriptor_set_collection: Vec<ADescriptorSet> = vec![descriptor_set, descriptor_set_color];
 
         self.pipeline = Some(pipeline);
         self.descriptor_set_collection = Some(descriptor_set_collection);
@@ -127,7 +128,7 @@ impl GfxObject {
         }
     }
 
-    pub fn get_descriptor_set_collection(&self) -> (Arc<DescriptorSet + Send + Sync>, Arc<DescriptorSet + Send + Sync>)
+    pub fn get_descriptor_set_collection(&self) -> (ADescriptorSet, ADescriptorSet)
     {
         match self.descriptor_set_collection {
             Some(ref descriptor_set_collection) => {
