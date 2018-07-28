@@ -9,6 +9,8 @@ use vulkano::framebuffer::RenderPassAbstract;
 use vulkano::framebuffer::Subpass;
 use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::vertex::OneVertexOneInstanceDefinition;
+
+use global::*;
 use math_utils;
 use shader_utils;
 use vertex_types::{Vertex2D, Vertex2DColor3D};
@@ -73,7 +75,7 @@ impl GfxObject {
             self.device.clone(),
             BufferUsage::all(),
             shader_utils::vs::ty::UniformMatrices {
-                world: math_utils::ortho(400.0, 200.0).into()
+                world: math_utils::ortho(SCR_WIDTH, SCR_HEIGHT).into()
             }
         ).unwrap();
 

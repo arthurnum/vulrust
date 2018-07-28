@@ -6,6 +6,7 @@ extern crate vulkano_shader_derive;
 extern crate winit;
 extern crate cgmath;
 extern crate time;
+extern crate rand;
 
 
 use std::sync::Arc;
@@ -29,6 +30,9 @@ use vulkano::sync::SharingMode;
 use vulkano_win::VkSurfaceBuild;
 use winit::EventsLoop;
 use winit::WindowBuilder;
+
+mod global;
+use global::*;
 
 mod math_utils;
 mod shader_utils;
@@ -91,7 +95,7 @@ fn main() {
     WINDOW
     ########## */
     println!("Window.");
-    let window_builder = WindowBuilder::new().with_dimensions(400, 200);
+    let window_builder = WindowBuilder::new().with_dimensions(SCR_WIDTH as u32, SCR_HEIGHT as u32);
     let mut events_loop = EventsLoop::new();
     let surface = window_builder.build_vk_surface(&events_loop, instance.clone()).unwrap();
 
@@ -99,7 +103,7 @@ fn main() {
     SWAPCHAIN
     ########## */
     let caps = surface.capabilities(physical_device).unwrap();
-    let dimensions = caps.current_extent.unwrap_or([400, 200]);
+    let dimensions = caps.current_extent.unwrap_or([SCR_WIDTH as u32, SCR_HEIGHT as u32]);
     let buffers_count = caps.min_image_count;
     let (format, _color_space) = caps.supported_formats[0];
     let usage = ImageUsage {
@@ -183,14 +187,19 @@ fn main() {
     rectangle.create_rectangle(80.0, 40.0);
 
     let mut rectangle_instances: Vec<RectangleInstance> = Vec::new();
-    rectangle_instances.push(RectangleInstanceBuilder::create(
-        [10.0, 10.0],
-        [1.0, 0.0, 0.0]
-    ));
-    rectangle_instances.push(RectangleInstanceBuilder::create(
-        [300.0, 120.0],
-        [0.0, 0.0, 1.0]
-    ));
+    for _i in 0..1000 {
+        rectangle_instances.push(RectangleInstanceBuilder::create(
+            [
+                rand::random::<f32>() * SCR_WIDTH,
+                rand::random::<f32>() * SCR_HEIGHT
+            ],
+            [
+                rand::random::<f32>(),
+                rand::random::<f32>(),
+                rand::random::<f32>()
+            ]
+        ));
+    }
 
     let instances_buffer = CpuAccessibleBuffer::from_iter(
         device.clone(),
