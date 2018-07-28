@@ -9,6 +9,8 @@ extern crate time;
 
 
 use std::sync::Arc;
+use vulkano::buffer::BufferUsage;
+use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::command_buffer::DynamicState;
 use vulkano::device::Device;
@@ -30,6 +32,14 @@ use winit::WindowBuilder;
 
 mod math_utils;
 mod shader_utils;
+mod vertex_types;
+
+mod rectangle_instance_builder;
+use rectangle_instance_builder::RectangleInstanceBuilder;
+
+mod rectangle_instance;
+use rectangle_instance::RectangleInstance;
+
 mod gfx_object;
 use gfx_object::GfxObject;
 
@@ -46,7 +56,12 @@ fn main() {
     PHYSICAL DEVICE
     ########## */
     println!("Physical device.");
-    let physical_device = PhysicalDevice::enumerate(&instance).next().unwrap();
+    let physical_device = {
+        let mut physical_devices = PhysicalDevice::enumerate(&instance);
+        physical_devices.next().unwrap();
+        physical_devices.next().unwrap()
+    };
+    println!("{:?}", physical_device.name());
 
     /* ##########
     DEVICE
@@ -164,14 +179,26 @@ fn main() {
         )
     ).collect();
 
-    let mut rectangles: Vec<GfxObject> = Vec::new();
+    let mut rectangle = GfxObject::new(device.clone(), render_pass.clone());
+    rectangle.create_rectangle(80.0, 40.0);
 
-    for j in 0..200 {
-        let i = j as f32;
-        let mut rectangle = GfxObject::new(device.clone(), render_pass.clone());
-        rectangle.create_rectangle([i, i], [i + 80.0, i + 40.0]);
-        rectangles.push(rectangle);
-    }
+    let mut rectangle_instances: Vec<RectangleInstance> = Vec::new();
+    rectangle_instances.push(RectangleInstanceBuilder::create(
+        [10.0, 10.0],
+        [1.0, 0.0, 0.0]
+    ));
+    rectangle_instances.push(RectangleInstanceBuilder::create(
+        [300.0, 120.0],
+        [0.0, 0.0, 1.0]
+    ));
+
+    let instances_buffer = CpuAccessibleBuffer::from_iter(
+        device.clone(),
+        BufferUsage::all(),
+        rectangle_instances.iter().map(|ri| {
+            ri.get_instance_vertex()
+        })
+    ).unwrap();
 
     /* ##########
     LOOP
@@ -201,19 +228,19 @@ fn main() {
             .begin_render_pass(framebuffers[index].clone(), false, vec![c_color, 1f32.into()])
             .unwrap();
 
-        for rectangle in &rectangles {
-            command_buffer_builder = command_buffer_builder.draw(
-                rectangle.get_pipeline(),
-                DynamicState {
-                    line_width: None,
-                    viewports: current_viewport.clone(),
-                    scissors: None,
-                },
-                rectangle.get_vertex_buffer(),
-                rectangle.get_descriptor_set_collection(),
-                ()
-            ).unwrap();
-        }
+
+        command_buffer_builder = command_buffer_builder.draw(
+            rectangle.get_pipeline(),
+            DynamicState {
+                line_width: None,
+                viewports: current_viewport.clone(),
+                scissors: None,
+            },
+            (rectangle.get_vertex_buffer(), instances_buffer.clone()),
+            rectangle.get_descriptor_set_collection(),
+            ()
+        ).unwrap();
+
 
         let command_buffer = command_buffer_builder
             .end_render_pass()

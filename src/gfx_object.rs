@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use vulkano::buffer::BufferUsage;
 use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
-use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::descriptor::PipelineLayoutAbstract;
 use vulkano::descriptor::descriptor_set::DescriptorSet;
 use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
@@ -9,16 +8,13 @@ use vulkano::device::Device;
 use vulkano::framebuffer::RenderPassAbstract;
 use vulkano::framebuffer::Subpass;
 use vulkano::pipeline::GraphicsPipeline;
-use vulkano::pipeline::vertex::SingleBufferDefinition;
+use vulkano::pipeline::vertex::OneVertexOneInstanceDefinition;
 use math_utils;
 use shader_utils;
+use vertex_types::{Vertex2D, Vertex2DColor3D};
 
 
-#[derive(Debug, Clone)]
-pub struct Vertex2D { pub position: [f32; 2] }
-impl_vertex!(Vertex2D, position);
-
-type SBuffer = SingleBufferDefinition<Vertex2D>;
+type SBuffer = OneVertexOneInstanceDefinition<Vertex2D, Vertex2DColor3D>;
 type BPipeline = Box<PipelineLayoutAbstract + Send + Sync>;
 type RPass = Arc<RenderPassAbstract + Send + Sync>;
 type ADescriptorSet = Arc<DescriptorSet + Send + Sync>;
@@ -42,16 +38,16 @@ impl GfxObject {
         }
     }
 
-    pub fn create_rectangle(&mut self, lb: [f32; 2], rt: [f32; 2])
+    pub fn create_rectangle(&mut self, w: f32, h: f32)
     {
         let vertex_buffer = CpuAccessibleBuffer::from_iter(
             self.device.clone(),
             BufferUsage::all(),
             vec![
-                Vertex2D { position: lb },
-                Vertex2D { position: [rt[0], lb[1]] },
-                Vertex2D { position: [lb[0], rt[1]] },
-                Vertex2D { position: rt },
+                Vertex2D { position: [0.0, 0.0] },
+                Vertex2D { position: [0.0, h] },
+                Vertex2D { position: [w, 0.0] },
+                Vertex2D { position: [w, h] },
             ].into_iter()
         ).unwrap();
 
@@ -62,7 +58,7 @@ impl GfxObject {
 
         let subpass = Subpass::from(self.render_pass.clone(), 0).expect("render pass failed");
         let pipeline: Arc<GraphicsPipeline<SBuffer, BPipeline, RPass>> = Arc::new(GraphicsPipeline::start()
-            .vertex_input_single_buffer::<Vertex2D>()
+            .vertex_input(OneVertexOneInstanceDefinition::<Vertex2D, Vertex2DColor3D>::new())
             .vertex_shader(vs.main_entry_point(), ())
             .triangle_strip()
             .viewports_dynamic_scissors_irrelevant(1)
@@ -72,11 +68,6 @@ impl GfxObject {
             .build(self.device.clone())
             .expect("render pass failed")
         );
-
-        let color_uniform_buffer = CpuBufferPool::new(self.device.clone(), BufferUsage::all());
-        let color_uniform_subbuffer = color_uniform_buffer.next(shader_utils::fs::ty::MetaColor {
-            incolor: [0.8, 0.2, 0.4, 1.0]
-        }).unwrap();
 
         let ortho_matrix_buffer = CpuAccessibleBuffer::from_data(
             self.device.clone(),
@@ -96,17 +87,7 @@ impl GfxObject {
             .unwrap()
         );
 
-        let descriptor_set_color = Arc::new(
-            PersistentDescriptorSet::start(pipeline.clone(), 1)
-
-            .add_buffer(color_uniform_subbuffer)
-            .unwrap()
-
-            .build()
-            .unwrap()
-        );
-
-        let descriptor_set_collection: Vec<ADescriptorSet> = vec![descriptor_set, descriptor_set_color];
+        let descriptor_set_collection: Vec<ADescriptorSet> = vec![descriptor_set];
 
         self.pipeline = Some(pipeline);
         self.descriptor_set_collection = Some(descriptor_set_collection);
@@ -128,15 +109,10 @@ impl GfxObject {
         }
     }
 
-    pub fn get_descriptor_set_collection(&self) -> (ADescriptorSet, ADescriptorSet)
+    pub fn get_descriptor_set_collection(&self) -> ADescriptorSet
     {
         match self.descriptor_set_collection {
-            Some(ref descriptor_set_collection) => {
-                (
-                    descriptor_set_collection[0].clone(),
-                    descriptor_set_collection[1].clone()
-                )
-            }
+            Some(ref descriptor_set_collection) => { descriptor_set_collection[0].clone() }
             None => { panic!("Empty descriptor set collection!") }
         }
     }
