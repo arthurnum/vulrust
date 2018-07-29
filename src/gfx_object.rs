@@ -75,7 +75,8 @@ impl GfxObject {
             self.device.clone(),
             BufferUsage::all(),
             shader_utils::vs::ty::UniformMatrices {
-                world: math_utils::ortho(SCR_WIDTH, SCR_HEIGHT).into()
+                // world: math_utils::ortho(SCR_WIDTH, SCR_HEIGHT).into()
+                world: math_utils::perspective().into()
             }
         ).unwrap();
 

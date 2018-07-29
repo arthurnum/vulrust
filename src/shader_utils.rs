@@ -17,7 +17,7 @@ pub mod vs {
 
     void main() {
         color = instance_color;
-        gl_Position = vec4(position + instance_position, 0.0, 1.0) * uniforms.world;
+        gl_Position = vec4(position + instance_position, -5.0, 1.0) * uniforms.world;
     }
 "]
 struct Dummy;

@@ -184,14 +184,18 @@ fn main() {
     ).collect();
 
     let mut rectangle = GfxObject::new(device.clone(), render_pass.clone());
-    rectangle.create_rectangle(80.0, 40.0);
+    rectangle.create_rectangle(1.0, 1.0);
 
     let mut rectangle_instances: Vec<RectangleInstance> = Vec::new();
-    for _i in 0..1000 {
+    for _i in 0..1 {
         rectangle_instances.push(RectangleInstanceBuilder::create(
             [
-                rand::random::<f32>() * SCR_WIDTH,
-                rand::random::<f32>() * SCR_HEIGHT
+                // rand::random::<f32>() * SCR_WIDTH,
+                // rand::random::<f32>(),
+                -5.0,
+                0.0
+                // rand::random::<f32>() * SCR_HEIGHT
+                // rand::random::<f32>()
             ],
             [
                 rand::random::<f32>(),
