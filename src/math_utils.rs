@@ -30,7 +30,7 @@ pub fn ortho(w: f32, h: f32) -> Matrix4<f32> {
 }
 
 pub fn perspective() -> Matrix4<f32> {
-    let f = Deg(45.0).cot();
+    let f = Deg(55.0).cot();
     let aspect = SCR_WIDTH / SCR_HEIGHT;
     let far = 100.0;
     let near = 0.01;

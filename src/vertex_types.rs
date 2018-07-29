@@ -1,12 +1,12 @@
 #[derive(Debug, Clone)]
-pub struct Vertex2D {
-    pub position: [f32; 2]
+pub struct Vertex3D {
+    pub position: [f32; 3]
 }
-impl_vertex!(Vertex2D, position);
+impl_vertex!(Vertex3D, position);
 
 #[derive(Debug, Clone)]
-pub struct Vertex2DColor3D {
-    pub instance_position: [f32; 2],
+pub struct Vertex3DColor3D {
+    pub instance_position: [f32; 3],
     pub instance_color: [f32; 3]
 }
-impl_vertex!(Vertex2DColor3D, instance_position, instance_color);
+impl_vertex!(Vertex3DColor3D, instance_position, instance_color);

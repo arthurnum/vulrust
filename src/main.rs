@@ -8,12 +8,13 @@ extern crate cgmath;
 extern crate time;
 extern crate rand;
 
-
 use std::sync::Arc;
 use vulkano::buffer::BufferUsage;
 use vulkano::buffer::cpu_access::CpuAccessibleBuffer;
+use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::command_buffer::DynamicState;
+use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use vulkano::device::Device;
 use vulkano::image::ImageUsage;
 use vulkano::framebuffer::Framebuffer;
@@ -190,12 +191,9 @@ fn main() {
     for _i in 0..1 {
         rectangle_instances.push(RectangleInstanceBuilder::create(
             [
-                // rand::random::<f32>() * SCR_WIDTH,
-                // rand::random::<f32>(),
                 -5.0,
-                0.0
-                // rand::random::<f32>() * SCR_HEIGHT
-                // rand::random::<f32>()
+                0.0,
+                -5.0
             ],
             [
                 rand::random::<f32>(),
@@ -227,6 +225,13 @@ fn main() {
         depth_range: 0.0 .. 1.0,
     }]);
 
+    let mut delta: f32 = 0.0;
+    let delta_uniform_pool = CpuBufferPool::new(device.clone(), BufferUsage::all());
+    let mut delta_buffer = delta_uniform_pool.next(shader_utils::vs::ty::DeltaUniform {
+        delta: (delta % 620.0) / 100.0
+    }).unwrap();
+
+
     loop {
         previous_frame_end.cleanup_finished();
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -236,6 +241,20 @@ fn main() {
         let c_color = [
             1.0 * (frame_counter as f32 % 200.0 / 200.0), 1.0, 0.0
         ].into();
+
+        delta += 0.50;
+        delta_buffer = delta_uniform_pool.next(shader_utils::vs::ty::DeltaUniform {
+            delta: (delta % 314.0) / 100.0
+        }).unwrap();
+        let delta_descriptor_set = Arc::new(
+            PersistentDescriptorSet::start(rectangle.get_pipeline(), 1)
+
+            .add_buffer(delta_buffer)
+            .unwrap()
+
+            .build()
+            .unwrap()
+        );
 
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary_one_time_submit(device.clone(), present_queue.family()).unwrap()
             .begin_render_pass(framebuffers[index].clone(), false, vec![c_color, 1f32.into()])
@@ -250,7 +269,7 @@ fn main() {
                 scissors: None,
             },
             (rectangle.get_vertex_buffer(), instances_buffer.clone()),
-            rectangle.get_descriptor_set_collection(),
+            (rectangle.get_descriptor_set_collection(), delta_descriptor_set.clone()),
             ()
         ).unwrap();
 

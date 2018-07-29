@@ -13,10 +13,10 @@ use vulkano::pipeline::vertex::OneVertexOneInstanceDefinition;
 use global::*;
 use math_utils;
 use shader_utils;
-use vertex_types::{Vertex2D, Vertex2DColor3D};
+use vertex_types::{Vertex3D, Vertex3DColor3D};
 
 
-type SBuffer = OneVertexOneInstanceDefinition<Vertex2D, Vertex2DColor3D>;
+type SBuffer = OneVertexOneInstanceDefinition<Vertex3D, Vertex3DColor3D>;
 type BPipeline = Box<PipelineLayoutAbstract + Send + Sync>;
 type RPass = Arc<RenderPassAbstract + Send + Sync>;
 type ADescriptorSet = Arc<DescriptorSet + Send + Sync>;
@@ -24,7 +24,7 @@ type ADescriptorSet = Arc<DescriptorSet + Send + Sync>;
 pub struct GfxObject {
     pub device: Arc<Device>,
     pub render_pass: RPass,
-    pub vertex_buffer: Option<Arc<CpuAccessibleBuffer<[Vertex2D]>>>,
+    pub vertex_buffer: Option<Arc<CpuAccessibleBuffer<[Vertex3D]>>>,
     pub pipeline: Option<Arc<GraphicsPipeline<SBuffer, BPipeline, RPass>>>,
     pub descriptor_set_collection: Option<Vec<ADescriptorSet>>
 }
@@ -46,10 +46,10 @@ impl GfxObject {
             self.device.clone(),
             BufferUsage::all(),
             vec![
-                Vertex2D { position: [0.0, 0.0] },
-                Vertex2D { position: [0.0, h] },
-                Vertex2D { position: [w, 0.0] },
-                Vertex2D { position: [w, h] },
+                Vertex3D { position: [0.0, 0.0, 0.0] },
+                Vertex3D { position: [0.0, h, 0.0] },
+                Vertex3D { position: [w, 0.0, 0.0] },
+                Vertex3D { position: [w, h, 0.0] },
             ].into_iter()
         ).unwrap();
 
@@ -60,7 +60,7 @@ impl GfxObject {
 
         let subpass = Subpass::from(self.render_pass.clone(), 0).expect("render pass failed");
         let pipeline: Arc<GraphicsPipeline<SBuffer, BPipeline, RPass>> = Arc::new(GraphicsPipeline::start()
-            .vertex_input(OneVertexOneInstanceDefinition::<Vertex2D, Vertex2DColor3D>::new())
+            .vertex_input(OneVertexOneInstanceDefinition::<Vertex3D, Vertex3DColor3D>::new())
             .vertex_shader(vs.main_entry_point(), ())
             .triangle_strip()
             .viewports_dynamic_scissors_irrelevant(1)
@@ -104,7 +104,7 @@ impl GfxObject {
         }
     }
 
-    pub fn get_vertex_buffer(&self) -> Arc<CpuAccessibleBuffer<[Vertex2D]>>
+    pub fn get_vertex_buffer(&self) -> Arc<CpuAccessibleBuffer<[Vertex3D]>>
     {
         match self.vertex_buffer {
             Some(ref vertex_buffer) => { vertex_buffer.clone() }
