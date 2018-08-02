@@ -48,6 +48,10 @@ use rectangle_instance::RectangleInstance;
 mod gfx_object;
 use gfx_object::GfxObject;
 
+mod world;
+use world::World;
+
+use cgmath::{Point3, Vector3, Matrix4, Matrix, Rad, perspective, One};
 
 fn main() {
     /* ##########
@@ -200,7 +204,7 @@ fn main() {
             [
                 -5.0 + rand::random::<f32>() * 10.0,
                 -5.0 + rand::random::<f32>() * 10.0,
-                -rand::random::<f32>() * 20.0
+                10.0 - rand::random::<f32>() * 20.0
             ],
             [
                 rand::random::<f32>(),
@@ -217,6 +221,32 @@ fn main() {
             ri.get_instance_vertex()
         })
     ).unwrap();
+
+    let world = World {
+        projection: perspective(Rad(1.5), SCR_WIDTH / SCR_HEIGHT, 0.01, 100.0).transpose(),
+        view: Matrix4::look_at(Point3::new(0.0, 0.0, 10.0), Point3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)).transpose(),
+        model: Matrix4::one()
+    };
+
+    let world_uniforms_buffer = CpuAccessibleBuffer::from_data(
+        device.clone(),
+        BufferUsage::all(),
+        shader_utils::vs::ty::UniformMatrices {
+            projection: world.projection.into(),
+            view: world.view.into(),
+            model: world.model.transpose().into()
+        }
+    ).unwrap();
+
+    let world_uniforms_descriptor = Arc::new(
+        PersistentDescriptorSet::start(rectangle.get_pipeline(), 0)
+
+        .add_buffer(world_uniforms_buffer)
+        .unwrap()
+
+        .build()
+        .unwrap()
+    );
 
     /* ##########
     LOOP
@@ -275,7 +305,7 @@ fn main() {
                 scissors: None,
             },
             (rectangle.get_vertex_buffer(), instances_buffer.clone()),
-            (rectangle.get_descriptor_set_collection(), delta_descriptor_set.clone()),
+            (world_uniforms_descriptor.clone(), delta_descriptor_set.clone()),
             ()
         ).unwrap();
 

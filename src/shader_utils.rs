@@ -12,8 +12,9 @@ pub mod vs {
     layout(location = 0) out vec3 color;
 
     layout(set = 0, binding = 0) uniform UniformMatrices {
-        mat4 world;
-        mat4 look_at;
+        mat4 projection;
+        mat4 view;
+        mat4 model;
     } uniforms;
 
     layout(set = 1, binding = 0) uniform DeltaUniform {
@@ -55,7 +56,7 @@ pub mod vs {
         mat4 r_matrix;
         rotation(delta_uniform.delta, vec3(0.0, 1.0, 0.0), r_matrix);
 
-        mat4 final_world = r_matrix * uniforms.look_at * uniforms.world;
+        mat4 final_world = r_matrix * uniforms.view * uniforms.projection;
 
         gl_Position = vec4(position, 1.0) * final_world;
     }
