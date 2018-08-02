@@ -329,7 +329,18 @@ fn main() {
         let mut done = false;
         events_loop.poll_events(|ev| {
             match ev {
-                winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => done = true,
+                winit::Event::WindowEvent { event, .. } => {
+                    match event {
+                        winit::WindowEvent::KeyboardInput { virtual_keycode, .. } => {
+                            match virtual_keycode {
+                                Some(keycode) => {},
+                                None => ()
+                            }
+                        }
+                        winit::WindowEvent::Closed => done = true,
+                        _ => ()
+                    }
+                },
                 _ => ()
             }
         });
