@@ -63,7 +63,7 @@ fn main() {
     println!("Physical device.");
     let physical_device = {
         let mut physical_devices = PhysicalDevice::enumerate(&instance);
-        physical_devices.next().unwrap();
+        // physical_devices.next().unwrap();
         physical_devices.next().unwrap()
     };
     println!("{:?}", physical_device.name());
@@ -112,6 +112,13 @@ fn main() {
         .. ImageUsage::none()
     };
     let sharing_mode = SharingMode::Exclusive(present_queue.family().id());
+    let present_mode = {
+        let cap_present_modes = &caps.present_modes;
+        if cap_present_modes.immediate { vulkano::swapchain::PresentMode::Immediate }
+        else if cap_present_modes.mailbox { vulkano::swapchain::PresentMode::Mailbox }
+        else { vulkano::swapchain::PresentMode::Fifo }
+    };
+    println!("PresentMode: {:?}", present_mode);
 
     // Create the swapchain and its buffers.
     println!("Swapchain.");
@@ -137,7 +144,7 @@ fn main() {
         // How to handle the alpha channel.
         vulkano::swapchain::CompositeAlpha::Opaque,
         // How to present images.
-        vulkano::swapchain::PresentMode::Mailbox,
+        present_mode,
         // Clip the parts of the buffer which aren't visible.
         true,
         // No previous swapchain.
@@ -191,14 +198,14 @@ fn main() {
     for _i in 0..1 {
         rectangle_instances.push(RectangleInstanceBuilder::create(
             [
-                -5.0,
                 0.0,
-                -5.0
+                0.0,
+                -2.0
             ],
             [
-                rand::random::<f32>(),
-                rand::random::<f32>(),
-                rand::random::<f32>()
+                rand::random::<f32>() / 2.0,
+                rand::random::<f32>() / 2.0,
+                rand::random::<f32>() / 2.0
             ]
         ));
     }
@@ -227,9 +234,6 @@ fn main() {
 
     let mut delta: f32 = 0.0;
     let delta_uniform_pool = CpuBufferPool::new(device.clone(), BufferUsage::all());
-    let mut delta_buffer = delta_uniform_pool.next(shader_utils::vs::ty::DeltaUniform {
-        delta: (delta % 620.0) / 100.0
-    }).unwrap();
 
 
     loop {
@@ -242,9 +246,9 @@ fn main() {
             1.0 * (frame_counter as f32 % 200.0 / 200.0), 1.0, 0.0
         ].into();
 
-        delta += 0.50;
-        delta_buffer = delta_uniform_pool.next(shader_utils::vs::ty::DeltaUniform {
-            delta: (delta % 314.0) / 100.0
+        delta += 1.50;
+        let delta_buffer = delta_uniform_pool.next(shader_utils::vs::ty::DeltaUniform {
+            delta: (delta % 630.0) / 100.0
         }).unwrap();
         let delta_descriptor_set = Arc::new(
             PersistentDescriptorSet::start(rectangle.get_pipeline(), 1)

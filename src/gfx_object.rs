@@ -11,9 +11,9 @@ use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::vertex::OneVertexOneInstanceDefinition;
 
 use global::*;
-use math_utils;
 use shader_utils;
 use vertex_types::{Vertex3D, Vertex3DColor3D};
+use cgmath::{Point3, Vector3, Matrix4, Matrix, Rad, perspective};
 
 
 type SBuffer = OneVertexOneInstanceDefinition<Vertex3D, Vertex3DColor3D>;
@@ -75,8 +75,8 @@ impl GfxObject {
             self.device.clone(),
             BufferUsage::all(),
             shader_utils::vs::ty::UniformMatrices {
-                // world: math_utils::ortho(SCR_WIDTH, SCR_HEIGHT).into()
-                world: math_utils::perspective().into()
+                world: perspective(Rad(1.9), SCR_WIDTH / SCR_HEIGHT, 0.01, 100.0).transpose().into(),
+                look_at: Matrix4::look_at(Point3::new(0.0, 0.0, 1.0), Point3::new(0.0, 0.0, -10.0), Vector3::new(0.0, 1.0, 0.0)).transpose().into()
             }
         ).unwrap();
 

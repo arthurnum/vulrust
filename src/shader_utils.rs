@@ -13,6 +13,7 @@ pub mod vs {
 
     layout(set = 0, binding = 0) uniform UniformMatrices {
         mat4 world;
+        mat4 look_at;
     } uniforms;
 
     layout(set = 1, binding = 0) uniform DeltaUniform {
@@ -41,17 +42,11 @@ pub mod vs {
 
 
         r_matrix = mat4(
-            vec4(a1, b1, c1, 0.0),
-            vec4(a2, b2, c2, 0.0),
-            vec4(a3, b3, c3, 0.0),
+            vec4(a1, b1, c1, instance_position.x),
+            vec4(a2, b2, c2, instance_position.y),
+            vec4(a3, b3, c3, instance_position.z),
             vec4(0.0, 0.0, 0.0, 1.0)
         );
-        // r_matrix = mat4(
-        //     vec4(a1, a2, a3, 0.0),
-        //     vec4(b1, b2, b3, 0.0),
-        //     vec4(c1, c2, c3, 0.0),
-        //     vec4(0.0, 0.0, 0.0, 1.0)
-        // );
     }
 
     void main() {
@@ -60,10 +55,9 @@ pub mod vs {
         mat4 r_matrix;
         rotation(delta_uniform.delta, vec3(0.0, 1.0, 0.0), r_matrix);
 
-        // gl_Position = uniforms.world * r_matrix * vec4(position + instance_position, 1.0);
-        gl_Position = ( vec4(position, 1.0) * r_matrix + vec4(instance_position, 1.0) ) * uniforms.world;
-        // gl_Position = vec4(position + instance_position, 1.0) * r_matrix * uniforms.world;
-        // gl_Position = vec4(position + instance_position, 1.0) * uniforms.world;
+        mat4 final_world = r_matrix * uniforms.look_at * uniforms.world;
+
+        gl_Position = vec4(position, 1.0) * final_world;
     }
 "]
 struct Dummy;
