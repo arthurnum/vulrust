@@ -56,9 +56,9 @@ pub mod vs {
         mat4 r_matrix;
         rotation(delta_uniform.delta, vec3(0.0, 1.0, 0.0), r_matrix);
 
-        mat4 final_world = r_matrix * uniforms.view * uniforms.projection;
+        mat4 final_world = uniforms.model * uniforms.view * uniforms.projection;
 
-        gl_Position = vec4(position, 1.0) * final_world;
+        gl_Position = vec4(position, 1.0) * r_matrix * final_world;
     }
 "]
 struct Dummy;

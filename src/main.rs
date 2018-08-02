@@ -67,7 +67,7 @@ fn main() {
     println!("Physical device.");
     let physical_device = {
         let mut physical_devices = PhysicalDevice::enumerate(&instance);
-        // physical_devices.next().unwrap();
+        physical_devices.next().unwrap();
         physical_devices.next().unwrap()
     };
     println!("{:?}", physical_device.name());
@@ -222,15 +222,14 @@ fn main() {
         })
     ).unwrap();
 
-    let world = World {
-        projection: perspective(Rad(1.5), SCR_WIDTH / SCR_HEIGHT, 0.01, 100.0).transpose(),
+    let mut world = World {
+        projection: perspective(Rad(1.4), SCR_WIDTH / SCR_HEIGHT, 0.01, 100.0).transpose(),
         view: Matrix4::look_at(Point3::new(0.0, 0.0, 10.0), Point3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)).transpose(),
         model: Matrix4::one()
     };
 
-    let world_uniforms_buffer = CpuAccessibleBuffer::from_data(
-        device.clone(),
-        BufferUsage::all(),
+    let world_uniforms_buffer_pool = CpuBufferPool::new(device.clone(), BufferUsage::all());
+    let mut world_uniforms_buffer = world_uniforms_buffer_pool.next(
         shader_utils::vs::ty::UniformMatrices {
             projection: world.projection.into(),
             view: world.view.into(),
@@ -238,10 +237,10 @@ fn main() {
         }
     ).unwrap();
 
-    let world_uniforms_descriptor = Arc::new(
+    let mut world_uniforms_descriptor = Arc::new(
         PersistentDescriptorSet::start(rectangle.get_pipeline(), 0)
 
-        .add_buffer(world_uniforms_buffer)
+        .add_buffer(world_uniforms_buffer.clone())
         .unwrap()
 
         .build()
@@ -264,7 +263,8 @@ fn main() {
 
     let mut delta: f32 = 0.0;
     let delta_uniform_pool = CpuBufferPool::new(device.clone(), BufferUsage::all());
-
+    let mut world_updated = false;
+    let mut pressed_keys: Vec<u32> = Vec::new();
 
     loop {
         previous_frame_end.cleanup_finished();
@@ -331,10 +331,15 @@ fn main() {
             match ev {
                 winit::Event::WindowEvent { event, .. } => {
                     match event {
-                        winit::WindowEvent::KeyboardInput { virtual_keycode, .. } => {
-                            match virtual_keycode {
-                                Some(keycode) => {},
-                                None => ()
+                        winit::WindowEvent::KeyboardInput { input, .. } => {
+                            println!("{:?}", input);
+                            match input.state {
+                                winit::ElementState::Pressed => {
+                                    pressed_keys.push(input.scancode);
+                                },
+                                winit::ElementState::Released => {
+                                    pressed_keys.retain(|&code| code != input.scancode)
+                                }
                             }
                         }
                         winit::WindowEvent::Closed => done = true,
@@ -345,6 +350,50 @@ fn main() {
             }
         });
         if done { break; }
+
+        for key in pressed_keys.iter() {
+            match key {
+                103 => {
+                    world.model = world.model * Matrix4::from_translation(Vector3::new(0.0, 0.0, 0.2));
+                    world_updated = true;
+                },
+                108 => {
+                    world.model = world.model * Matrix4::from_translation(Vector3::new(0.0, 0.0, -0.2));
+                    world_updated = true;
+                },
+                106 => {
+                    world.model = Matrix4::from_angle_y(Rad(0.02)) * world.model;
+                    world_updated = true;
+                },
+                105 => {
+                    world.model = Matrix4::from_angle_y(Rad(-0.02)) * world.model;
+                    world_updated = true;
+                },
+                _ => ()
+            }
+        }
+
+        if world_updated {
+            world_updated = false;
+
+            world_uniforms_buffer = world_uniforms_buffer_pool.next(
+                shader_utils::vs::ty::UniformMatrices {
+                    projection: world.projection.into(),
+                    view: world.view.into(),
+                    model: world.model.transpose().into()
+                }
+            ).unwrap();
+
+            world_uniforms_descriptor = Arc::new(
+                PersistentDescriptorSet::start(rectangle.get_pipeline(), 0)
+
+                .add_buffer(world_uniforms_buffer.clone())
+                .unwrap()
+
+                .build()
+                .unwrap()
+            );
+        }
 
         // println!("Frame #{:?}", frame_counter);
         frame_counter += 1;
