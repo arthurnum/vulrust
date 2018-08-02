@@ -195,17 +195,17 @@ fn main() {
     rectangle.create_rectangle(1.0, 1.0);
 
     let mut rectangle_instances: Vec<RectangleInstance> = Vec::new();
-    for _i in 0..1 {
+    for _i in 0..100 {
         rectangle_instances.push(RectangleInstanceBuilder::create(
             [
-                0.0,
-                0.0,
-                -2.0
+                -5.0 + rand::random::<f32>() * 10.0,
+                -5.0 + rand::random::<f32>() * 10.0,
+                -rand::random::<f32>() * 20.0
             ],
             [
-                rand::random::<f32>() / 2.0,
-                rand::random::<f32>() / 2.0,
-                rand::random::<f32>() / 2.0
+                rand::random::<f32>(),
+                rand::random::<f32>(),
+                rand::random::<f32>()
             ]
         ));
     }
@@ -243,10 +243,12 @@ fn main() {
         let (index, acq_future) = vulkano::swapchain::acquire_next_image(swapchain.clone(), None).unwrap();
 
         let c_color = [
-            1.0 * (frame_counter as f32 % 200.0 / 200.0), 1.0, 0.0
+            1.0 * (frame_counter as f32 % 1200.0 / 1200.0),
+            1.0 * (frame_counter as f32 % 120.0 / 120.0),
+            1.0 * (frame_counter as f32 % 2000.0 / 2000.0)
         ].into();
 
-        delta += 1.50;
+        delta += 2.0;
         let delta_buffer = delta_uniform_pool.next(shader_utils::vs::ty::DeltaUniform {
             delta: (delta % 630.0) / 100.0
         }).unwrap();
