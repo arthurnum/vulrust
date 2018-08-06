@@ -51,7 +51,7 @@ use gfx_object::GfxObject;
 mod world;
 use world::World;
 
-use cgmath::{Point3, Vector3, Matrix4, Matrix, Rad, perspective, One};
+use cgmath::{Point3, Vector3, Vector4, Matrix4, Matrix, Rad, InnerSpace, perspective, One};
 
 fn main() {
     /* ##########
@@ -225,7 +225,8 @@ fn main() {
     let mut world = World {
         projection: perspective(Rad(1.4), SCR_WIDTH / SCR_HEIGHT, 0.01, 100.0).transpose(),
         view: Matrix4::look_at(Point3::new(0.0, 0.0, 10.0), Point3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)).transpose(),
-        model: Matrix4::one()
+        model: Matrix4::one(),
+        direction_angle: 0.0
     };
 
     let world_uniforms_buffer_pool = CpuBufferPool::new(device.clone(), BufferUsage::all());
@@ -354,18 +355,24 @@ fn main() {
         for key in pressed_keys.iter() {
             match key {
                 103 => {
-                    world.model = world.model * Matrix4::from_translation(Vector3::new(0.0, 0.0, 0.2));
+                    let mut direction = (Matrix4::from_angle_y(Rad(world.direction_angle)) * Vector4::new(0.0, 0.0, 1.0, 1.0)).truncate().normalize() * 0.2;
+                    direction.x *= -1.0;
+                    world.model = world.model * Matrix4::from_translation(direction);
                     world_updated = true;
                 },
                 108 => {
-                    world.model = world.model * Matrix4::from_translation(Vector3::new(0.0, 0.0, -0.2));
+                    let mut direction = (Matrix4::from_angle_y(Rad(world.direction_angle)) * Vector4::new(0.0, 0.0, 1.0, 1.0)).truncate().normalize() * (-0.2);
+                    direction.x *= -1.0;
+                    world.model = world.model * Matrix4::from_translation(direction);
                     world_updated = true;
                 },
                 106 => {
+                    world.direction_angle = world.direction_angle + 0.02;
                     world.model = Matrix4::from_angle_y(Rad(0.02)) * world.model;
                     world_updated = true;
                 },
                 105 => {
+                    world.direction_angle = world.direction_angle - 0.02;
                     world.model = Matrix4::from_angle_y(Rad(-0.02)) * world.model;
                     world_updated = true;
                 },
