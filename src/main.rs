@@ -31,6 +31,7 @@ use vulkano::sync::SharingMode;
 use vulkano_win::VkSurfaceBuild;
 use winit::EventsLoop;
 use winit::WindowBuilder;
+use winit::VirtualKeyCode;
 
 mod global;
 use global::*;
@@ -54,7 +55,17 @@ use world::World;
 
 use cgmath::{Point3, Vector3, Matrix4, Matrix, Rad, perspective, One};
 
+
+fn avoid_winit_wayland_hack() {
+    println!("Force X11.");
+    std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+}
+
 fn main() {
+    if cfg!(target_os = "linux") {
+        avoid_winit_wayland_hack();
+    }
+
     /* ##########
     INSTANCE
     ########## */
@@ -68,7 +79,7 @@ fn main() {
     println!("Physical device.");
     let physical_device = {
         let mut physical_devices = PhysicalDevice::enumerate(&instance);
-        // physical_devices.next().unwrap();
+        physical_devices.next().unwrap();
         physical_devices.next().unwrap()
     };
     println!("{:?}", physical_device.name());
@@ -228,7 +239,7 @@ fn main() {
 
     let mut world = World {
         projection: perspective(Rad(1.4), SCR_WIDTH / SCR_HEIGHT, 0.01, 100.0).transpose(),
-        view: Matrix4::look_at(Point3::new(2.0, -2.0, 7.0), Point3::new(2.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)).transpose(),
+        view: Matrix4::look_at(Point3::new(2.0, -2.0, 6.0), Point3::new(2.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)).transpose(),
         model: Matrix4::one(),
         direction_angle: 0.0
     };
@@ -289,7 +300,7 @@ fn main() {
     let mut delta: f32 = 0.0;
     let delta_uniform_pool = CpuBufferPool::new(device.clone(), BufferUsage::all());
     let mut world_updated = false;
-    let mut pressed_keys: Vec<u32> = Vec::new();
+    let mut pressed_keys: Vec<Option<VirtualKeyCode>> = Vec::new();
 
     loop {
         previous_frame_end.cleanup_finished();
@@ -372,12 +383,12 @@ fn main() {
                             println!("{:?}", input);
                             match input.state {
                                 winit::ElementState::Pressed => {
-                                    if !pressed_keys.contains(&input.scancode) {
-                                        pressed_keys.push(input.scancode);
+                                    if !pressed_keys.contains(&input.virtual_keycode) {
+                                        pressed_keys.push(input.virtual_keycode);
                                     }
                                 },
                                 winit::ElementState::Released => {
-                                    pressed_keys.retain(|&code| code != input.scancode)
+                                    pressed_keys.retain(|&code| code != input.virtual_keycode)
                                 }
                             }
                         }
@@ -392,23 +403,19 @@ fn main() {
 
         for key in pressed_keys.iter() {
             match key {
-                // 103 => {
-                126 => {
+                Some(VirtualKeyCode::Up) => {
                     world.move_forwards();
                     world_updated = true;
                 },
-                // 108 => {
-                125 => {
+                Some(VirtualKeyCode::Down) => {
                     world.move_backwards();
                     world_updated = true;
                 },
-                // 106 => {
-                123 => {
+                Some(VirtualKeyCode::Right) => {
                     world.rotate_clockwise();
                     world_updated = true;
                 },
-                // 105 => {
-                124 => {
+                Some(VirtualKeyCode::Left) => {
                     world.rotate_counterclockwise();
                     world_updated = true;
                 },

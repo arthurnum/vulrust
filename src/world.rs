@@ -25,11 +25,11 @@ impl World {
     }
 
     pub fn rotate_clockwise(&mut self) {
-        self._rotate(-0.02);
+        self._rotate(0.02);
     }
 
     pub fn rotate_counterclockwise(&mut self) {
-        self._rotate(0.02);
+        self._rotate(-0.02);
     }
 
     fn _move(&mut self, k: f32) {
