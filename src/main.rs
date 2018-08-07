@@ -47,6 +47,7 @@ use rectangle_instance::RectangleInstance;
 
 mod gfx_object;
 use gfx_object::GfxObject;
+use gfx_object::GfxObject3D;
 
 mod world;
 use world::World;
@@ -67,7 +68,7 @@ fn main() {
     println!("Physical device.");
     let physical_device = {
         let mut physical_devices = PhysicalDevice::enumerate(&instance);
-        physical_devices.next().unwrap();
+        // physical_devices.next().unwrap();
         physical_devices.next().unwrap()
     };
     println!("{:?}", physical_device.name());
@@ -195,6 +196,9 @@ fn main() {
         )
     ).collect();
 
+    let mut cube = GfxObject3D::new(device.clone(), render_pass.clone());
+    cube.create_cube();
+
     let mut rectangle = GfxObject::new(device.clone(), render_pass.clone());
     rectangle.create_rectangle(1.0, 1.0);
 
@@ -224,7 +228,7 @@ fn main() {
 
     let mut world = World {
         projection: perspective(Rad(1.4), SCR_WIDTH / SCR_HEIGHT, 0.01, 100.0).transpose(),
-        view: Matrix4::look_at(Point3::new(0.0, 0.0, 10.0), Point3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)).transpose(),
+        view: Matrix4::look_at(Point3::new(2.0, -2.0, 7.0), Point3::new(2.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)).transpose(),
         model: Matrix4::one(),
         direction_angle: 0.0
     };
@@ -242,6 +246,26 @@ fn main() {
         PersistentDescriptorSet::start(rectangle.get_pipeline(), 0)
 
         .add_buffer(world_uniforms_buffer.clone())
+        .unwrap()
+
+        .build()
+        .unwrap()
+    );
+
+    let world_uniforms_buffer_pool_cube = CpuBufferPool::new(device.clone(), BufferUsage::all());
+    let mut world_uniforms_buffer_cube = world_uniforms_buffer_pool_cube.next(
+        shader_utils::vs_cube::ty::UniformMatrices {
+            projection: world.projection.into(),
+            view: world.view.into(),
+            model: world.model.transpose().into()
+        }
+    ).unwrap();
+
+
+    let mut world_uniforms_descriptor_cube = Arc::new(
+        PersistentDescriptorSet::start(cube.get_pipeline(), 0)
+
+        .add_buffer(world_uniforms_buffer_cube.clone())
         .unwrap()
 
         .build()
@@ -310,6 +334,18 @@ fn main() {
             ()
         ).unwrap();
 
+        command_buffer_builder = command_buffer_builder.draw(
+            cube.get_pipeline(),
+            DynamicState {
+                line_width: None,
+                viewports: current_viewport.clone(),
+                scissors: None,
+            },
+            cube.get_vertex_buffer(),
+            world_uniforms_descriptor_cube.clone(),
+            ()
+        ).unwrap();
+
 
         let command_buffer = command_buffer_builder
             .end_render_pass()
@@ -336,7 +372,9 @@ fn main() {
                             println!("{:?}", input);
                             match input.state {
                                 winit::ElementState::Pressed => {
-                                    pressed_keys.push(input.scancode);
+                                    if !pressed_keys.contains(&input.scancode) {
+                                        pressed_keys.push(input.scancode);
+                                    }
                                 },
                                 winit::ElementState::Released => {
                                     pressed_keys.retain(|&code| code != input.scancode)
@@ -354,19 +392,23 @@ fn main() {
 
         for key in pressed_keys.iter() {
             match key {
-                103 => {
+                // 103 => {
+                126 => {
                     world.move_forwards();
                     world_updated = true;
                 },
-                108 => {
+                // 108 => {
+                125 => {
                     world.move_backwards();
                     world_updated = true;
                 },
-                106 => {
+                // 106 => {
+                123 => {
                     world.rotate_clockwise();
                     world_updated = true;
                 },
-                105 => {
+                // 105 => {
+                124 => {
                     world.rotate_counterclockwise();
                     world_updated = true;
                 },
@@ -389,6 +431,25 @@ fn main() {
                 PersistentDescriptorSet::start(rectangle.get_pipeline(), 0)
 
                 .add_buffer(world_uniforms_buffer.clone())
+                .unwrap()
+
+                .build()
+                .unwrap()
+            );
+
+            world_uniforms_buffer_cube = world_uniforms_buffer_pool_cube.next(
+                shader_utils::vs_cube::ty::UniformMatrices {
+                    projection: world.projection.into(),
+                    view: world.view.into(),
+                    model: world.model.transpose().into()
+                }
+            ).unwrap();
+
+
+            world_uniforms_descriptor_cube = Arc::new(
+                PersistentDescriptorSet::start(cube.get_pipeline(), 0)
+
+                .add_buffer(world_uniforms_buffer_cube.clone())
                 .unwrap()
 
                 .build()

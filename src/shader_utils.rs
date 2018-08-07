@@ -80,3 +80,59 @@ pub mod fs {
 "]
 struct Dummy;
 }
+
+#[allow(dead_code)]
+pub mod vs_cube {
+#[derive(VulkanoShader)]
+#[ty = "vertex"]
+#[src = "
+    #version 450
+    layout(location = 0) in vec3 position;
+    layout(location = 1) in vec3 normal;
+
+    layout(location = 0) out vec3 vNormal;
+
+    layout(set = 0, binding = 0) uniform UniformMatrices {
+        mat4 projection;
+        mat4 view;
+        mat4 model;
+    } uniforms;
+
+    void main() {
+        vNormal = normal;
+        mat4 final_world = uniforms.view * uniforms.projection;
+
+        gl_Position = vec4(position, 1.0) * final_world;
+    }
+"]
+struct Dummy;
+}
+
+#[allow(dead_code)]
+pub mod fs_cube {
+#[derive(VulkanoShader)]
+#[ty = "fragment"]
+#[src = "
+    #version 450
+    layout(location = 0) in vec3 vNormal;
+
+    layout(location = 0) out vec4 f_color;
+
+    layout(set = 0, binding = 0) uniform UniformMatrices {
+        mat4 projection;
+        mat4 view;
+        mat4 model;
+    } uniforms;
+
+    void main() {
+        vec3 light_direction = normalize(vec3(1.0, -0.5, 0.0));
+        light_direction = (vec4(light_direction, 0.0) * uniforms.model).xyz;
+
+        float k = dot(light_direction, vNormal) / (length(light_direction) * length(vNormal));
+        k = max(k, 0.25);
+
+        f_color = vec4(k, k, k, 1.0);
+    }
+"]
+struct Dummy;
+}

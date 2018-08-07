@@ -7,12 +7,14 @@ use vulkano::framebuffer::RenderPassAbstract;
 use vulkano::framebuffer::Subpass;
 use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::vertex::OneVertexOneInstanceDefinition;
+use vulkano::pipeline::vertex::SingleBufferDefinition;
 
 use shader_utils;
-use vertex_types::{Vertex3D, Vertex3DColor3D};
+use vertex_types::{Vertex3D, Vertex3DColor3D, Vertex3DNormal3D};
 
 
 type SBuffer = OneVertexOneInstanceDefinition<Vertex3D, Vertex3DColor3D>;
+type DOBuffer = SingleBufferDefinition<Vertex3DNormal3D>;
 type BPipeline = Box<PipelineLayoutAbstract + Send + Sync>;
 type RPass = Arc<RenderPassAbstract + Send + Sync>;
 
@@ -76,6 +78,113 @@ impl GfxObject {
     }
 
     pub fn get_vertex_buffer(&self) -> Arc<CpuAccessibleBuffer<[Vertex3D]>>
+    {
+        match self.vertex_buffer {
+            Some(ref vertex_buffer) => { vertex_buffer.clone() }
+            None => { panic!("Empty vertex buffer!") }
+        }
+    }
+}
+
+pub struct GfxObject3D {
+    pub device: Arc<Device>,
+    pub render_pass: RPass,
+    pub vertex_buffer: Option<Arc<CpuAccessibleBuffer<[Vertex3DNormal3D]>>>,
+    pub pipeline: Option<Arc<GraphicsPipeline<DOBuffer, BPipeline, RPass>>>
+}
+
+impl GfxObject3D {
+    pub fn new(device: Arc<Device>, render_pass: RPass) -> GfxObject3D {
+        GfxObject3D {
+            device: device,
+            render_pass: render_pass,
+            vertex_buffer: None,
+            pipeline: None
+        }
+    }
+
+    pub fn create_cube(&mut self)
+    {
+        let _vertices: Vec<[f32; 3]> = vec![
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 1.0, 1.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 0.0, 1.0],
+            [1.0, 1.0, 0.0],
+            [1.0, 1.0, 1.0]
+        ];
+
+        let _normals: Vec<[f32; 3]> = vec![
+            [ 0.0,  0.0,  1.0],
+            [ 0.0,  0.0, -1.0],
+            [ 0.0,  1.0,  0.0],
+            [ 0.0, -1.0,  0.0],
+            [ 1.0,  0.0,  0.0],
+            [-1.0,  0.0,  0.0]
+        ];
+
+        let _faces: Vec<(u32, u32)> = vec![
+            (1, 2), (7, 2), (5, 2),
+            (1, 2), (3, 2), (7, 2),
+            (1, 6), (4, 6), (3, 6),
+            (1, 6), (2, 6), (4, 6),
+            (3, 3), (8, 3), (7, 3),
+            (3, 3), (4, 3), (8, 3),
+            (5, 5), (7, 5), (8, 5),
+            (5, 5), (8, 5), (6, 5),
+            (1, 4), (5, 4), (6, 4),
+            (1, 4), (6, 4), (2, 4),
+            (2, 1), (6, 1), (8, 1),
+            (2, 1), (8, 1), (4, 1)
+        ];
+
+        let _data: Vec<Vertex3DNormal3D> = _faces.iter().map(|&_face| {
+            let vi: u32 = _face.0 - 1;
+            let ni: u32 = _face.1 - 1;
+            Vertex3DNormal3D {
+                position: _vertices[vi as usize].clone(),
+                normal: _normals[ni as usize].clone()
+            }
+        }).collect();
+
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(
+            self.device.clone(),
+            BufferUsage::all(),
+            _data.into_iter()
+        ).unwrap();
+
+        self.vertex_buffer = Some(vertex_buffer);
+
+        let vs = shader_utils::vs_cube::Shader::load(self.device.clone()).expect("failed to create shader module");
+        let fs = shader_utils::fs_cube::Shader::load(self.device.clone()).expect("failed to create shader module");
+
+        let subpass = Subpass::from(self.render_pass.clone(), 0).expect("render pass failed");
+        let pipeline: Arc<GraphicsPipeline<DOBuffer, BPipeline, RPass>> = Arc::new(GraphicsPipeline::start()
+            .vertex_input(SingleBufferDefinition::<Vertex3DNormal3D>::new())
+            .vertex_shader(vs.main_entry_point(), ())
+            .triangle_list()
+            .viewports_dynamic_scissors_irrelevant(1)
+            .fragment_shader(fs.main_entry_point(), ())
+            .depth_stencil_simple_depth()
+            .render_pass(subpass)
+            .build(self.device.clone())
+            .expect("render pass failed")
+        );
+
+        self.pipeline = Some(pipeline);
+    }
+
+    pub fn get_pipeline(&self) -> Arc<GraphicsPipeline<DOBuffer, BPipeline, RPass>>
+    {
+        match self.pipeline {
+            Some(ref pipeline) => { pipeline.clone() }
+            None => { panic!("Empty pipeline!") }
+        }
+    }
+
+    pub fn get_vertex_buffer(&self) -> Arc<CpuAccessibleBuffer<[Vertex3DNormal3D]>>
     {
         match self.vertex_buffer {
             Some(ref vertex_buffer) => { vertex_buffer.clone() }
