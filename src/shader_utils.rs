@@ -136,3 +136,55 @@ pub mod fs_cube {
 "]
 struct Dummy;
 }
+
+#[allow(dead_code)]
+pub mod vs_plane_hmap {
+#[derive(VulkanoShader)]
+#[ty = "vertex"]
+#[src = "
+    #version 450
+    layout(location = 0) in vec3 position;
+    layout(location = 1) in vec2 uv;
+
+    layout(location = 0) out vec2 fuv;
+
+    layout(set = 0, binding = 0) uniform UniformMatrices {
+        mat4 projection;
+        mat4 view;
+        mat4 model;
+    } uniforms;
+    layout(set = 1, binding = 0) uniform sampler2D hmap;
+
+    void main() {
+        fuv = uv;
+
+        mat4 final_world = uniforms.model * uniforms.view * uniforms.projection;
+
+        vec3 pos = position;
+        pos.y = -(texture(hmap, fuv).x) * 5.0;
+
+        gl_Position = vec4(pos, 1.0) * final_world;
+    }
+"]
+struct Dummy;
+}
+
+#[allow(dead_code)]
+pub mod fs_plane_hmap {
+#[derive(VulkanoShader)]
+#[ty = "fragment"]
+#[src = "
+    #version 450
+    layout(location = 0) in vec2 fuv;
+
+    layout(location = 0) out vec4 f_color;
+
+    layout(set = 1, binding = 0) uniform sampler2D hmap;
+
+    void main() {
+        float k = texture(hmap, fuv).x;
+        f_color = vec4(0.9, 0.8, 0.6, 1.0) * k;
+    }
+"]
+struct Dummy;
+}

@@ -10,11 +10,12 @@ use vulkano::pipeline::vertex::OneVertexOneInstanceDefinition;
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 
 use shader_utils;
-use vertex_types::{Vertex3D, Vertex3DColor3D, Vertex3DNormal3D};
+use vertex_types::{Vertex3D, Vertex3DColor3D, Vertex3DNormal3D, Vertex3DUV};
 
 
 type SBuffer = OneVertexOneInstanceDefinition<Vertex3D, Vertex3DColor3D>;
 type DOBuffer = SingleBufferDefinition<Vertex3DNormal3D>;
+type UVBuffer = SingleBufferDefinition<Vertex3DUV>;
 type BPipeline = Box<PipelineLayoutAbstract + Send + Sync>;
 type RPass = Arc<RenderPassAbstract + Send + Sync>;
 
@@ -185,6 +186,118 @@ impl GfxObject3D {
     }
 
     pub fn get_vertex_buffer(&self) -> Arc<CpuAccessibleBuffer<[Vertex3DNormal3D]>>
+    {
+        match self.vertex_buffer {
+            Some(ref vertex_buffer) => { vertex_buffer.clone() }
+            None => { panic!("Empty vertex buffer!") }
+        }
+    }
+}
+
+pub struct GfxObjectHMap {
+    pub device: Arc<Device>,
+    pub render_pass: RPass,
+    pub vertex_buffer: Option<Arc<CpuAccessibleBuffer<[Vertex3DUV]>>>,
+    pub pipeline: Option<Arc<GraphicsPipeline<UVBuffer, BPipeline, RPass>>>
+}
+
+impl GfxObjectHMap {
+    pub fn new(device: Arc<Device>, render_pass: RPass) -> GfxObjectHMap {
+        GfxObjectHMap {
+            device: device,
+            render_pass: render_pass,
+            vertex_buffer: None,
+            pipeline: None
+        }
+    }
+
+    pub fn create_plane_square(&mut self, dim: u32, s: f32)
+    {
+        let mut _data: Vec<Vertex3DUV> = Vec::new();
+
+        let uv_s = 1.0 / (dim as f32);
+        (0 .. dim + 1).for_each(|i| {
+            (0 .. dim + 1).for_each(|j| {
+                let x = s * i as f32;
+                let z = -s * j as f32;
+
+                let left_bottom_vertex  = [    x, 0.0,     z];
+                let left_top_vertex     = [    x, 0.0, z - s];
+                let right_bottom_vertex = [x + s, 0.0,     z];
+                let right_top_vertex    = [x + s, 0.0, z - s];
+
+                let u = (i as f32) / (dim as f32);
+                let v = (j as f32) / (dim as f32);
+
+                let left_bottom_uv =  [       u,        v];
+                let left_top_uv    =  [       u, v + uv_s];
+                let right_bottom_uv = [u + uv_s,        v];
+                let right_top_uv =    [u + uv_s, v + uv_s];
+
+                _data.push(Vertex3DUV {
+                    position: left_bottom_vertex,
+                    uv: left_bottom_uv
+                });
+                _data.push(Vertex3DUV {
+                    position: left_top_vertex,
+                    uv: left_top_uv
+                });
+                _data.push(Vertex3DUV {
+                    position: right_bottom_vertex,
+                    uv: right_bottom_uv
+                });
+
+                _data.push(Vertex3DUV {
+                    position: left_top_vertex,
+                    uv: left_top_uv
+                });
+                _data.push(Vertex3DUV {
+                    position: right_bottom_vertex,
+                    uv: right_bottom_uv
+                });
+                _data.push(Vertex3DUV {
+                    position: right_top_vertex,
+                    uv: right_top_uv
+                });
+            })
+        });
+
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(
+            self.device.clone(),
+            BufferUsage::all(),
+            _data.into_iter()
+        ).unwrap();
+
+        self.vertex_buffer = Some(vertex_buffer);
+
+        let vs = shader_utils::vs_plane_hmap::Shader::load(self.device.clone()).expect("failed to create shader module");
+        let fs = shader_utils::fs_plane_hmap::Shader::load(self.device.clone()).expect("failed to create shader module");
+
+        let subpass = Subpass::from(self.render_pass.clone(), 0).expect("render pass failed");
+        let pipeline: Arc<GraphicsPipeline<UVBuffer, BPipeline, RPass>> = Arc::new(GraphicsPipeline::start()
+            .vertex_input(SingleBufferDefinition::<Vertex3DUV>::new())
+            .vertex_shader(vs.main_entry_point(), ())
+            .triangle_list()
+            .viewports_dynamic_scissors_irrelevant(1)
+            .fragment_shader(fs.main_entry_point(), ())
+            .depth_stencil_simple_depth()
+            .render_pass(subpass)
+            .build(self.device.clone())
+            .expect("render pass failed")
+        );
+
+        self.pipeline = Some(pipeline);
+    }
+
+    pub fn get_pipeline(&self) -> Arc<GraphicsPipeline<UVBuffer, BPipeline, RPass>>
+    {
+        match self.pipeline {
+            Some(ref pipeline) => { pipeline.clone() }
+            None => { panic!("Empty pipeline!") }
+        }
+    }
+
+    pub fn get_vertex_buffer(&self) -> Arc<CpuAccessibleBuffer<[Vertex3DUV]>>
     {
         match self.vertex_buffer {
             Some(ref vertex_buffer) => { vertex_buffer.clone() }

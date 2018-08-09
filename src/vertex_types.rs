@@ -17,3 +17,10 @@ pub struct Vertex3DColor3D {
     pub instance_color: [f32; 3]
 }
 impl_vertex!(Vertex3DColor3D, instance_position, instance_color);
+
+#[derive(Debug, Clone)]
+pub struct Vertex3DUV {
+    pub position: [f32; 3],
+    pub uv: [f32; 2]
+}
+impl_vertex!(Vertex3DUV, position, uv);

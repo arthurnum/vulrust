@@ -7,6 +7,7 @@ extern crate winit;
 extern crate cgmath;
 extern crate time;
 extern crate rand;
+extern crate image;
 
 use std::sync::Arc;
 use vulkano::buffer::BufferUsage;
@@ -18,6 +19,7 @@ use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use vulkano::device::Device;
 use vulkano::image::ImageUsage;
 use vulkano::framebuffer::Framebuffer;
+use vulkano::image::immutable::ImmutableImage;
 use vulkano::instance::DeviceExtensions;
 use vulkano::instance::Features;
 use vulkano::instance::Instance;
@@ -49,6 +51,7 @@ use rectangle_instance::RectangleInstance;
 mod gfx_object;
 use gfx_object::GfxObject;
 use gfx_object::GfxObject3D;
+use gfx_object::GfxObjectHMap;
 
 mod world;
 use world::World;
@@ -61,10 +64,16 @@ fn avoid_winit_wayland_hack() {
     std::env::set_var("WINIT_UNIX_BACKEND", "x11");
 }
 
+fn load_image_sample() -> image::RgbImage {
+    image::open("./fixtures/97295-mountain2-height-map-merged.png").unwrap().to_rgb()
+}
+
 fn main() {
     if cfg!(target_os = "linux") {
         avoid_winit_wayland_hack();
     }
+
+    load_image_sample();
 
     /* ##########
     INSTANCE
@@ -207,6 +216,9 @@ fn main() {
         )
     ).collect();
 
+    let mut terrain_plane = GfxObjectHMap::new(device.clone(), render_pass.clone());
+    terrain_plane.create_plane_square(500, 0.15);
+
     let mut cube = GfxObject3D::new(device.clone(), render_pass.clone());
     cube.create_cube();
 
@@ -239,7 +251,7 @@ fn main() {
 
     let mut world = World {
         projection: perspective(Rad(1.4), SCR_WIDTH / SCR_HEIGHT, 0.01, 100.0).transpose(),
-        view: Matrix4::look_at(Point3::new(2.0, -2.0, 6.0), Point3::new(2.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)).transpose(),
+        view: Matrix4::look_at(Point3::new(2.0, -6.0, 7.0), Point3::new(2.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)).transpose(),
         model: Matrix4::one(),
         direction_angle: 0.0
     };
@@ -283,11 +295,55 @@ fn main() {
         .unwrap()
     );
 
+    let mut world_uniforms_descriptor_terrain_plane = Arc::new(
+        PersistentDescriptorSet::start(terrain_plane.get_pipeline(), 0)
+
+        .add_buffer(world_uniforms_buffer.clone())
+        .unwrap()
+
+        .build()
+        .unwrap()
+    );
+
+    let (image_sample, image_sample_future) = {
+        let _image_sample = load_image_sample();
+        let (w, h) = _image_sample.dimensions();
+
+        ImmutableImage::from_iter(
+            _image_sample.into_raw().into_iter(),
+            vulkano::image::Dimensions::Dim2d { width: w, height: h },
+            vulkano::format::R8G8B8Srgb,
+            present_queue.clone()
+        ).unwrap()
+    };
+
+    let sampler = vulkano::sampler::Sampler::new(
+            device.clone(),
+            vulkano::sampler::Filter::Linear,
+            vulkano::sampler::Filter::Linear,
+            vulkano::sampler::MipmapMode::Nearest,
+            vulkano::sampler::SamplerAddressMode::Repeat,
+            vulkano::sampler::SamplerAddressMode::Repeat,
+            vulkano::sampler::SamplerAddressMode::Repeat,
+            0.0, 1.0, 0.0, 0.0
+        ).unwrap();
+
+    let image_sample_descriptor = Arc::new(
+        PersistentDescriptorSet::start(terrain_plane.get_pipeline(), 1)
+
+        .add_sampled_image(image_sample.clone(), sampler.clone())
+        .unwrap()
+
+        .build()
+        .unwrap()
+    );
+
     /* ##########
     LOOP
     ########## */
     println!("Loop.");
-    let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
+    // let mut previous_frame_end = Box::new(now(device.clone())) as Box<GpuFuture>;
+    let mut previous_frame_end = Box::new(image_sample_future) as Box<GpuFuture>;
     let mut frame_counter = 1;
     let start_time = time::SteadyTime::now();
 
@@ -354,6 +410,18 @@ fn main() {
             },
             cube.get_vertex_buffer(),
             world_uniforms_descriptor_cube.clone(),
+            ()
+        ).unwrap();
+
+        command_buffer_builder = command_buffer_builder.draw(
+            terrain_plane.get_pipeline(),
+            DynamicState {
+                line_width: None,
+                viewports: current_viewport.clone(),
+                scissors: None,
+            },
+            terrain_plane.get_vertex_buffer(),
+            (world_uniforms_descriptor_terrain_plane.clone(), image_sample_descriptor.clone()),
             ()
         ).unwrap();
 
@@ -457,6 +525,16 @@ fn main() {
                 PersistentDescriptorSet::start(cube.get_pipeline(), 0)
 
                 .add_buffer(world_uniforms_buffer_cube.clone())
+                .unwrap()
+
+                .build()
+                .unwrap()
+            );
+
+            world_uniforms_descriptor_terrain_plane = Arc::new(
+                PersistentDescriptorSet::start(terrain_plane.get_pipeline(), 0)
+
+                .add_buffer(world_uniforms_buffer.clone())
                 .unwrap()
 
                 .build()
