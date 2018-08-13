@@ -34,6 +34,7 @@ use vulkano_win::VkSurfaceBuild;
 use winit::EventsLoop;
 use winit::WindowBuilder;
 use winit::VirtualKeyCode;
+use winit::dpi::LogicalSize;
 
 mod global;
 use global::*;
@@ -121,7 +122,7 @@ fn main() {
     WINDOW
     ########## */
     println!("Window.");
-    let window_builder = WindowBuilder::new().with_dimensions(SCR_WIDTH as u32, SCR_HEIGHT as u32);
+    let window_builder = WindowBuilder::new().with_dimensions(LogicalSize::new(SCR_WIDTH as f64, SCR_HEIGHT as f64));
     let mut events_loop = EventsLoop::new();
     let surface = window_builder.build_vk_surface(&events_loop, instance.clone()).unwrap();
 
@@ -353,6 +354,12 @@ fn main() {
         depth_range: 0.0 .. 1.0,
     }]);
 
+    let dynamic_state = DynamicState {
+        line_width: None,
+        viewports: current_viewport.clone(),
+        scissors: None,
+    };
+
     let mut delta: f32 = 0.0;
     let delta_uniform_pool = CpuBufferPool::new(device.clone(), BufferUsage::all());
     let mut world_updated = false;
@@ -391,11 +398,7 @@ fn main() {
 
         command_buffer_builder = command_buffer_builder.draw(
             rectangle.get_pipeline(),
-            DynamicState {
-                line_width: None,
-                viewports: current_viewport.clone(),
-                scissors: None,
-            },
+            &dynamic_state,
             (rectangle.get_vertex_buffer(), instances_buffer.clone()),
             (world_uniforms_descriptor.clone(), delta_descriptor_set.clone()),
             ()
@@ -403,11 +406,7 @@ fn main() {
 
         command_buffer_builder = command_buffer_builder.draw(
             cube.get_pipeline(),
-            DynamicState {
-                line_width: None,
-                viewports: current_viewport.clone(),
-                scissors: None,
-            },
+            &dynamic_state,
             cube.get_vertex_buffer(),
             world_uniforms_descriptor_cube.clone(),
             ()
@@ -415,11 +414,7 @@ fn main() {
 
         command_buffer_builder = command_buffer_builder.draw(
             terrain_plane.get_pipeline(),
-            DynamicState {
-                line_width: None,
-                viewports: current_viewport.clone(),
-                scissors: None,
-            },
+            &dynamic_state,
             terrain_plane.get_vertex_buffer(),
             (world_uniforms_descriptor_terrain_plane.clone(), image_sample_descriptor.clone()),
             ()
@@ -460,7 +455,7 @@ fn main() {
                                 }
                             }
                         }
-                        winit::WindowEvent::Closed => done = true,
+                        winit::WindowEvent::CloseRequested => done = true,
                         _ => ()
                     }
                 },

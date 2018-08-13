@@ -4,10 +4,10 @@ version = "0.1.0"
 authors = ["Artur Yerameyeu"]
 
 [dependencies]
-vulkano = "0.9.0"
-vulkano-win = "0.9.0"
-vulkano-shader-derive = "0.9.0"
-winit = "0.11.2"
+vulkano = "0.10.0"
+vulkano-win = "0.10.0"
+vulkano-shader-derive = "0.10.0"
+winit = "0.17.0"
 cgmath = "0.16.1"
 time = "0.1.40"
 rand = "0.5.4"
