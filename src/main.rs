@@ -65,8 +65,8 @@ fn avoid_winit_wayland_hack() {
     std::env::set_var("WINIT_UNIX_BACKEND", "x11");
 }
 
-fn load_image_sample() -> image::RgbImage {
-    image::open("./fixtures/97295-mountain2-height-map-merged.png").unwrap().to_rgb()
+fn load_image_sample() -> image::RgbaImage {
+    image::open("./fixtures/97295-mountain2-height-map-merged.png").unwrap().to_rgba()
 }
 
 fn main() {
@@ -89,7 +89,7 @@ fn main() {
     println!("Physical device.");
     let physical_device = {
         let mut physical_devices = PhysicalDevice::enumerate(&instance);
-        physical_devices.next().unwrap();
+        // physical_devices.next().unwrap();
         physical_devices.next().unwrap()
     };
     println!("{:?}", physical_device.name());
@@ -313,7 +313,7 @@ fn main() {
         ImmutableImage::from_iter(
             _image_sample.into_raw().into_iter(),
             vulkano::image::Dimensions::Dim2d { width: w, height: h },
-            vulkano::format::R8G8B8Srgb,
+            format,
             present_queue.clone()
         ).unwrap()
     };

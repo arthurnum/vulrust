@@ -9,6 +9,10 @@ use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::vertex::OneVertexOneInstanceDefinition;
 use vulkano::pipeline::vertex::SingleBufferDefinition;
 
+use std::fs::File;
+use std::io::Read;
+use std::mem::transmute;
+
 use shader_utils;
 use vertex_types::{Vertex3D, Vertex3DColor3D, Vertex3DNormal3D, Vertex3DUV};
 
@@ -141,14 +145,53 @@ impl GfxObject3D {
             (2, 1), (8, 1), (4, 1)
         ];
 
-        let _data: Vec<Vertex3DNormal3D> = _faces.iter().map(|&_face| {
-            let vi: u32 = _face.0 - 1;
-            let ni: u32 = _face.1 - 1;
-            Vertex3DNormal3D {
-                position: _vertices[vi as usize].clone(),
-                normal: _normals[ni as usize].clone()
+        // let _data: Vec<Vertex3DNormal3D> = _faces.iter().map(|&_face| {
+        //     let vi: u32 = _face.0 - 1;
+        //     let ni: u32 = _face.1 - 1;
+        //     Vertex3DNormal3D {
+        //         position: _vertices[vi as usize].clone(),
+        //         normal: _normals[ni as usize].clone()
+        //     }
+        // }).collect();
+
+        let mut file = File::open("cube.data").unwrap();
+
+        let mut data: Vec<f32> = Vec::new();
+        let mut double_buffer: [u8; 4] = [0; 4];
+
+        let mut read = true;
+
+        while read {
+            match file.read(&mut double_buffer) {
+                Ok(size) => {
+                    if size < 1 { read = false }
+                }
+                Err(err) => read = false
             }
-        }).collect();
+
+            if read {
+                unsafe {
+                    data.push(transmute::<[u8; 4], f32>(double_buffer));
+                }
+            }
+        }
+
+        let mut _data: Vec<Vertex3DNormal3D> = Vec::new();
+
+        while !data.is_empty() {
+            let v: Vec<_> = data.drain(..3).collect();
+            let n: Vec<_> = data.drain(..3).collect();
+            let mut vd = [0f32; 3];
+            let mut nd = [0f32; 3];
+            vd.copy_from_slice(v.as_slice());
+            nd.copy_from_slice(n.as_slice());
+            _data.push(
+                Vertex3DNormal3D {
+                    position: vd,
+                    normal: nd
+                }
+            );
+        }
 
         let vertex_buffer = CpuAccessibleBuffer::from_iter(
             self.device.clone(),
