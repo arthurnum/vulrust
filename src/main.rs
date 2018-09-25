@@ -251,7 +251,7 @@ fn main() {
     ).unwrap();
 
     let mut world = World {
-        projection: perspective(Rad(1.4), SCR_WIDTH / SCR_HEIGHT, 0.01, 100.0).transpose(),
+        projection: perspective(Rad(0.86), SCR_WIDTH / SCR_HEIGHT, 0.01, 100.0).transpose(),
         view: Matrix4::look_at(Point3::new(2.0, -6.0, 7.0), Point3::new(2.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0)).transpose(),
         model: Matrix4::one(),
         direction_angle: 0.0

@@ -1,35 +1,68 @@
 require 'nokogiri'
+require 'pry'
 
 def run
-  doc = File.open('cube-sample.dae') { |f| Nokogiri::XML(f) }
-  geometry_node = doc.css('library_geometries')
+  doc = File.open('collada/cube-sample.dae') { |f| Nokogiri::XML(f) }
+  geometry_node = doc.css('library_geometries').first.css('geometry').first
   mesh_node = geometry_node.css('mesh')
 
-  vertices = mesh_node.css('[id=Cube-mesh-positions-array]')[0].content.split.map(&:to_f)
-  p vertices
+  triangles_node = mesh_node.css('triangles').first || mesh_node.css('polylist').first
+  input_nodes = triangles_node.css('input')
 
-  normals = mesh_node.css('[id=Cube-mesh-normals-array]')[0].content.split.map(&:to_f)
-  p normals
+  input_stride = input_nodes.size
 
-  faces = mesh_node.css('triangles').css('p')[0].content.split.map(&:to_i)
+  vertex_data = nil
+  vertex_offset = nil
+
+  normal_data = nil
+  normal_offset = nil
+
+  input_nodes.each do |input|
+    semantic = input.attributes["semantic"].value
+
+    if semantic == "VERTEX"
+      vertex_offset = input.attributes["offset"].value.to_i
+      source_id = input.attributes["source"].value
+      source = mesh_node.css(source_id).first
+
+      if source.name == "vertices"
+        next_input = source.css('[semantic=POSITION]').first
+        source_id = next_input.attributes["source"].value
+
+        source = mesh_node.css(source_id)
+      end
+
+      vertex_data = source.css('float_array').first.content.split.map(&:to_f)
+    end
+
+    if semantic == "NORMAL"
+      normal_offset = input.attributes["offset"].value.to_i
+      source_id = input.attributes["source"].value
+      source = mesh_node.css(source_id).first
+
+      normal_data = source.css('float_array').first.content.split.map(&:to_f)
+    end
+  end
+
+  faces = triangles_node.css('p')[0].content.split.map(&:to_i)
 
   data = []
 
   while !faces.empty?
-    face = faces.shift(3)
+    face = faces.shift(input_stride)
 
-    v = face[0] * 3
-    n = face[1] * 3
+    v = face[vertex_offset] * 3
+    n = face[normal_offset] * 3
 
     # Y-negative
     # Z-up
-    data << vertices[v]
-    data << -vertices[v+2]
-    data << vertices[v+1]
+    data << vertex_data[v]
+    data << -vertex_data[v+2]
+    data << vertex_data[v+1]
 
-    data << normals[n]
-    data << -normals[n+2]
-    data << normals[n+1]
+    data << normal_data[n]
+    data << -normal_data[n+2]
+    data << normal_data[n+1]
   end
 
   p data
