@@ -1,8 +1,7 @@
 #[macro_use]
 extern crate vulkano;
 extern crate vulkano_win;
-#[macro_use]
-extern crate vulkano_shader_derive;
+extern crate vulkano_shaders;
 extern crate winit;
 extern crate cgmath;
 extern crate time;
@@ -17,11 +16,11 @@ use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::command_buffer::DynamicState;
 use vulkano::descriptor::descriptor_set::PersistentDescriptorSet;
 use vulkano::device::Device;
+use vulkano::device::DeviceExtensions;
+use vulkano::device::Features;
 use vulkano::image::ImageUsage;
 use vulkano::framebuffer::Framebuffer;
 use vulkano::image::immutable::ImmutableImage;
-use vulkano::instance::DeviceExtensions;
-use vulkano::instance::Features;
 use vulkano::instance::Instance;
 use vulkano::instance::InstanceExtensions;
 use vulkano::instance::PhysicalDevice;
@@ -89,7 +88,7 @@ fn main() {
     println!("Physical device.");
     let physical_device = {
         let mut physical_devices = PhysicalDevice::enumerate(&instance);
-        physical_devices.next().unwrap();
+        // physical_devices.next().unwrap();
         physical_devices.next().unwrap()
     };
     println!("{:?}", physical_device.name());
